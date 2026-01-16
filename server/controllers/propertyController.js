@@ -1,29 +1,28 @@
+// server/controllers/propertyController.js
 const Property = require('../models/Property');
 const cloudinary = require('cloudinary').v2;
 
-// Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// @desc    Create a new property
+// @desc    Create a new property (seller submits -> pending)
 // @route   POST /api/properties
-// @access  Private
+// @access  Private (seller/admin via middleware)
 const createProperty = async (req, res) => {
   try {
     const { title, description, price, address, city, category, rooms } = req.body;
 
-    let imageUrl = '';
-    let imageId = '';
+    const images = [];
 
     if (req.file) {
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: 'real_estate_properties',
       });
-      imageUrl = result.secure_url;
-      imageId = result.public_id;
+
+      images.push({ url: result.secure_url, public_id: result.public_id });
     }
 
     const property = await Property.create({
@@ -34,8 +33,9 @@ const createProperty = async (req, res) => {
       location: { address, city },
       category,
       rooms,
-      images: [{ url: imageUrl, public_id: imageId }],
+      images, // ✅ empty array if no upload
       status: 'pending',
+      adminComment: '',
     });
 
     res.status(201).json(property);
@@ -45,35 +45,31 @@ const createProperty = async (req, res) => {
   }
 };
 
-// @desc    Get all approved properties with Filters
+// @desc    Get all approved properties with filters
 // @route   GET /api/properties
 // @access  Public
 const getProperties = async (req, res) => {
   try {
-    // Start with default query: Only show Approved properties
-    let query = { status: 'approved' };
+    const query = { status: 'approved' };
 
-    // 1. Search by Keyword (Matches Title OR Description)
     if (req.query.keyword) {
       query.$or = [
         { title: { $regex: req.query.keyword, $options: 'i' } },
-        { description: { $regex: req.query.keyword, $options: 'i' } }
+        { description: { $regex: req.query.keyword, $options: 'i' } },
       ];
     }
 
-    // 2. Filter by City
     if (req.query.city) {
       query['location.city'] = { $regex: req.query.city, $options: 'i' };
     }
 
-    // 3. Filter by Category
     if (req.query.category && req.query.category !== 'All') {
       query.category = req.query.category;
     }
 
-    // 4. Filter by Max Price
     if (req.query.maxPrice) {
-      query.price = { $lte: req.query.maxPrice };
+      const maxPrice = Number(req.query.maxPrice);
+      if (!Number.isNaN(maxPrice)) query.price = { $lte: maxPrice };
     }
 
     const properties = await Property.find(query)
@@ -94,41 +90,39 @@ const getProperty = async (req, res) => {
   try {
     const property = await Property.findById(req.params.id).populate('seller', 'name email');
 
-    if (!property) {
-      return res.status(404).json({ message: 'Property not found' });
-    }
+    if (!property) return res.status(404).json({ message: 'Property not found' });
 
     res.json(property);
   } catch (error) {
     console.error(error);
-    if (error.kind === 'ObjectId') {
-        return res.status(404).json({ message: 'Property not found' });
-    }
-    res.status(500).json({ message: 'Server Error' });
+    return res.status(404).json({ message: 'Property not found' });
   }
 };
 
-// @desc    Update property
+// @desc    Update property (seller)
 // @route   PUT /api/properties/:id
 // @access  Private
 const updateProperty = async (req, res) => {
   try {
     const property = await Property.findById(req.params.id);
+    if (!property) return res.status(404).json({ message: 'Property not found' });
 
-    if (!property) {
-      return res.status(404).json({ message: 'Property not found' });
-    }
-
-    // Check if user is the seller
     if (property.seller.toString() !== req.user.id) {
       return res.status(401).json({ message: 'Not authorized' });
     }
 
-    const updatedProperty = await Property.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
+    // ✅ Only allow editable fields
+    const allowed = ['title', 'description', 'price', 'location', 'category', 'rooms', 'isAvailable'];
+    const updates = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+
+    // ✅ If seller edits, it goes back to pending for re-approval
+    updates.status = 'pending';
+    updates.adminComment = '';
+
+    const updatedProperty = await Property.findByIdAndUpdate(req.params.id, updates, { new: true });
 
     res.json(updatedProperty);
   } catch (error) {
@@ -142,7 +136,6 @@ const updateProperty = async (req, res) => {
 // @access  Private
 const getMyProperties = async (req, res) => {
   try {
-    // Find properties where seller == logged in user
     const properties = await Property.find({ seller: req.user.id }).sort({ createdAt: -1 });
     res.json(properties);
   } catch (error) {
@@ -151,9 +144,9 @@ const getMyProperties = async (req, res) => {
   }
 };
 
-// @desc    Delete property
+/// @desc    Delete property
 // @route   DELETE /api/properties/:id
-// @access  Private
+// @access  Private (Seller owns it OR Admin)
 const deleteProperty = async (req, res) => {
   try {
     const property = await Property.findById(req.params.id);
@@ -162,57 +155,69 @@ const deleteProperty = async (req, res) => {
       return res.status(404).json({ message: 'Property not found' });
     }
 
-    // Check if user is the seller
-    if (property.seller.toString() !== req.user.id) {
-      return res.status(401).json({ message: 'Not authorized' });
+    const isOwner = property.seller.toString() === req.user.id;
+    const isAdmin = req.user.role === 'admin';
+
+    // ✅ Seller can delete own listing, Admin can delete any listing
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'Forbidden: Not allowed to delete this listing' });
     }
 
     await property.deleteOne();
-
-    res.json({ id: req.params.id });
+    res.json({ id: req.params.id, message: 'Property deleted successfully' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// @desc    Get ALL properties (Admin only)
+
+// @desc    Get ALL properties (Admin)
 // @route   GET /api/properties/admin-all
 // @access  Private/Admin
 const getAllPropertiesAdmin = async (req, res) => {
   try {
-    // Return all properties, sorted by Pending first
     const properties = await Property.find({})
-      .sort({ status: -1, createdAt: -1 }) // "Pending" starts with P, so it sorts near top
-      .populate('seller', 'name email');
+      .populate('seller', 'name email')
+      // ✅ Pending first using explicit order
+      .sort({ createdAt: -1 });
+
+    // ✅ Stable pending-first ordering in code (no guessing with string sort)
+    const rank = { pending: 0, rejected: 1, approved: 2 };
+    properties.sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9));
+
     res.json(properties);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// @desc    Update property status (Approve/Reject)
+// @desc    Update property status (Approve/Reject + optional comment)
 // @route   PUT /api/properties/:id/status
 // @access  Private/Admin
 const updateStatus = async (req, res) => {
   try {
-    const { status } = req.body; // Expect "approved" or "rejected"
+    const { status, adminComment } = req.body;
 
-    const property = await Property.findById(req.params.id);
-    if (!property) {
-      return res.status(404).json({ message: 'Property not found' });
+    if (!['approved', 'rejected', 'pending'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status value' });
     }
 
-    property.status = status;
-    await property.save();
+    const property = await Property.findById(req.params.id);
+    if (!property) return res.status(404).json({ message: 'Property not found' });
 
+    property.status = status;
+    if (adminComment !== undefined) property.adminComment = String(adminComment);
+
+    await property.save();
     res.json(property);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// EXPORT ALL FUNCTIONS
 module.exports = {
   getProperties,
   getProperty,

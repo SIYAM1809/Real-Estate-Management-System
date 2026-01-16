@@ -27,7 +27,17 @@ function Login() {
     }
 
     if (isSuccess || user) {
-      navigate('/'); // Redirect to Home/Dashboard
+      // --- ADD THIS LINE ---
+      console.log("LOGIN SUCCESS! User Role is:", user?.role); 
+      // --------------------
+
+      if (user?.role === 'seller') {
+        navigate('/seller-dashboard');
+      } else if (user?.role === 'admin') {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     }
 
     dispatch(reset());

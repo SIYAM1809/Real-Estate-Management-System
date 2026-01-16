@@ -1,3 +1,4 @@
+// client/src/features/favorites/favoriteService.js
 import axios from 'axios';
 
 const API_URL = 'http://localhost:5000/api/users/favorites/';
@@ -20,9 +21,7 @@ const getFavorites = async (token) => {
 
 // Toggle Favorite (Add/Remove)
 const toggleFavorite = async (propertyId, token) => {
-  // 1. Safety Check: Do we actually have a badge?
   if (!token) {
-    console.error("TOGGLE FAILED: Token is missing!");
     throw new Error('No authentication token found. Please login again.');
   }
 
@@ -32,8 +31,8 @@ const toggleFavorite = async (propertyId, token) => {
     },
   };
 
-  // 2. Correct PUT Request (Url, Data, Config)
-  const response = await axios.put(API_URL + propertyId, {}, config);
+  // PUT (url, body, config)
+  const response = await axios.put(`${API_URL}${propertyId}`, {}, config);
   return response.data;
 };
 

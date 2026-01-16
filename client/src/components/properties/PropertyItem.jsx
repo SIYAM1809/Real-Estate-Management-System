@@ -7,7 +7,7 @@ import { toast } from 'react-toastify';
 function PropertyItem({ property }) {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
-  const { favorites = [], isLoading } = useSelector((state) => state.favorites) || {};
+  const { favorites = [] } = useSelector((state) => state.favorites) || {};
 
   // --- UNIVERSAL CHECK ---
   // This works for both Strings (Old Backend) and Objects (New Backend)
@@ -23,25 +23,19 @@ function PropertyItem({ property }) {
   });
   // -----------------------
 
-  const handleFavorite = async (e) => {
+  const handleFavorite = (e) => {
     e.preventDefault(); 
     if (!user) {
       toast.error('Please login to save favorites');
       return;
     }
+    dispatch(toggleFavorite(property._id));
     
-    try {
-      await dispatch(toggleFavorite(property._id)).unwrap();
-      
-      // Optimistic UI Feedback
-      if(isFavorite) {
-          toast.info('Removed from favorites');
-      } else {
-          toast.success('Added to favorites');
-      }
-    } catch (error) {
-      toast.error(error || 'Failed to update favorites');
-      console.error('Favorite toggle error:', error);
+    // Optimistic UI Feedback
+    if(isFavorite) {
+        toast.info('Removed from favorites');
+    } else {
+        toast.success('Added to favorites');
     }
   };
 
@@ -51,14 +45,9 @@ function PropertyItem({ property }) {
       {/* HEART BUTTON */}
       <button 
         onClick={handleFavorite}
-        disabled={isLoading}
-        className="absolute top-3 right-3 z-10 p-2 bg-white rounded-full shadow-md hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        className="absolute top-3 right-3 z-10 p-2 bg-white rounded-full shadow-md hover:bg-gray-100 transition"
       >
-        {isLoading ? (
-            <div className="animate-spin">
-              <FaHeart className="text-gray-400 text-xl" />
-            </div>
-        ) : isFavorite ? (
+        {isFavorite ? (
             <FaHeart className="text-red-500 text-xl" />
         ) : (
             <FaRegHeart className="text-gray-400 text-xl" />

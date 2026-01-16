@@ -1,7 +1,18 @@
+// server/controllers/userController.js
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
+
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+};
+
+const normalizeRole = (role) => {
+  const r = role ? String(role).trim().toLowerCase() : 'buyer';
+  if (r === 'buyer' || r === 'seller' || r === 'admin') return r;
+  return 'buyer';
+};
 
 // @desc    Register new user
 // @route   POST /api/users
@@ -14,38 +25,37 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error('Please add all fields');
   }
 
-  // Check if user exists
-  const userExists = await User.findOne({ email });
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const normalizedRole = normalizeRole(role);
 
+  const userExists = await User.findOne({ email: normalizedEmail });
   if (userExists) {
     res.status(400);
     throw new Error('User already exists');
   }
 
-  // Hash password
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
 
-  // Create user
   const user = await User.create({
     name,
-    email,
+    email: normalizedEmail,
     password: hashedPassword,
-    role: role || 'buyer', // Default to buyer if not specified
+    role: normalizedRole,
   });
 
-  if (user) {
-    res.status(201).json({
-      _id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id),
-    });
-  } else {
+  if (!user) {
     res.status(400);
     throw new Error('Invalid user data');
   }
+
+  res.status(201).json({
+    _id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    token: generateToken(user._id),
+  });
 });
 
 // @desc    Authenticate a user
@@ -54,21 +64,33 @@ const registerUser = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // Check for user email
-  const user = await User.findOne({ email });
+  if (!email || !password) {
+    res.status(400);
+    throw new Error('Please provide email and password');
+  }
 
-  if (user && (await bcrypt.compare(password, user.password))) {
-    res.json({
-      _id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id),
-    });
-  } else {
+  const normalizedEmail = String(email).trim().toLowerCase();
+
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user) {
+    res.status(400);
+    throw new Error('Invalid credentials (User not found)');
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+
+  if (!isMatch) {
     res.status(400);
     throw new Error('Invalid credentials');
   }
+
+  res.json({
+    _id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    token: generateToken(user._id),
+  });
 });
 
 // @desc    Get user data
@@ -78,46 +100,34 @@ const getMe = asyncHandler(async (req, res) => {
   res.status(200).json(req.user);
 });
 
-// @desc    Add or Remove property from favorites
+// @desc    Toggle favorite
 // @route   PUT /api/users/favorites/:id
 // @access  Private
 const toggleFavorite = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     const propertyId = req.params.id;
-    let isAdded = false; // Track action
 
-    // 1. ROBUST CHECK: Find index by converting ObjectId to String
-    // This prevents "ObjectId vs String" mismatch errors
-    const index = user.favorites.findIndex(id => id.toString() === propertyId);
+    const index = user.favorites.findIndex((id) => id.toString() === propertyId);
 
-    if (index !== -1) {
-      // Found: Remove it
-      user.favorites.splice(index, 1);
-      isAdded = false;
-    } else {
-      // Not Found: Add it
-      user.favorites.push(propertyId);
-      isAdded = true;
-    }
+    if (index !== -1) user.favorites.splice(index, 1);
+    else user.favorites.push(propertyId);
 
     await user.save();
 
-    // 2. CRITICAL FIX: Fetch the full objects again so the Frontend doesn't break
     const updatedUser = await User.findById(req.user.id).populate('favorites');
 
-    res.status(200).json({ 
-      message: isAdded ? 'Added to favorites' : 'Removed from favorites', 
-      favorites: updatedUser.favorites // Send back FULL OBJECTS, not just IDs
+    res.status(200).json({
+      message: index !== -1 ? 'Removed from favorites' : 'Added to favorites',
+      favorites: updatedUser.favorites,
     });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// @desc    Get user favorites
+// @desc    Get favorites
 // @route   GET /api/users/favorites
 // @access  Private
 const getFavorites = async (req, res) => {
@@ -128,13 +138,6 @@ const getFavorites = async (req, res) => {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
-};
-
-// Generate JWT
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d',
-  });
 };
 
 module.exports = {

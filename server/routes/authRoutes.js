@@ -1,7 +1,9 @@
 // server/routes/authRoutes.js
 const express = require('express');
 const router = express.Router();
-const { registerUser, loginUser } = require('../controllers/authController');
+
+// ✅ Reuse the SAME secure controllers used by /api/users
+const { registerUser, loginUser } = require('../controllers/userController');
 
 router.post('/register', registerUser);
 router.post('/login', loginUser);

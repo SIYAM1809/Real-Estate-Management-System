@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import favoriteService from './favoriteService';
 
 const initialState = {
-  favorites: [], // Will store FULL OBJECTS now
+  favorites: [],
   isLoading: false,
   isError: false,
   message: '',
@@ -13,13 +13,12 @@ export const getFavorites = createAsyncThunk(
   'favorites/getAll',
   async (_, thunkAPI) => {
     try {
-      const state = thunkAPI.getState();
-      const user = state.auth?.user;
-      
-      if (!user || !user.token) {
+      const user = thunkAPI.getState()?.auth?.user;
+
+      if (!user?.token) {
         throw new Error('No authentication token found. Please login again.');
       }
-      
+
       return await favoriteService.getFavorites(user.token);
     } catch (error) {
       const message = error.response?.data?.message || error.message;
@@ -33,13 +32,12 @@ export const toggleFavorite = createAsyncThunk(
   'favorites/toggle',
   async (propertyId, thunkAPI) => {
     try {
-      const state = thunkAPI.getState();
-      const user = state.auth?.user;
-      
-      if (!user || !user.token) {
+      const user = thunkAPI.getState()?.auth?.user;
+
+      if (!user?.token) {
         throw new Error('No authentication token found. Please login again.');
       }
-      
+
       return await favoriteService.toggleFavorite(propertyId, user.token);
     } catch (error) {
       const message = error.response?.data?.message || error.message;
@@ -49,14 +47,13 @@ export const toggleFavorite = createAsyncThunk(
 );
 
 export const favoriteSlice = createSlice({
-  name: 'favorite',
+  name: 'favorites',
   initialState,
   reducers: {
-    reset: (state) => initialState,
+    reset: () => initialState, // ✅ correct reset
   },
   extraReducers: (builder) => {
     builder
-      // Get Favorites Cases
       .addCase(getFavorites.pending, (state) => {
         state.isLoading = true;
         state.isError = false;
@@ -64,15 +61,14 @@ export const favoriteSlice = createSlice({
       })
       .addCase(getFavorites.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.favorites = action.payload; 
+        state.favorites = action.payload;
       })
       .addCase(getFavorites.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
       })
-      
-      // Toggle Favorite Cases
+
       .addCase(toggleFavorite.pending, (state) => {
         state.isLoading = true;
         state.isError = false;
@@ -80,7 +76,7 @@ export const favoriteSlice = createSlice({
       })
       .addCase(toggleFavorite.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.favorites = action.payload.favorites;
+        state.favorites = action.payload?.favorites || [];
       })
       .addCase(toggleFavorite.rejected, (state, action) => {
         state.isLoading = false;

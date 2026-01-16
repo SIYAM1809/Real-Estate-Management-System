@@ -1,98 +1,129 @@
 // server/controllers/authController.js
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
-const Log = require('../models/Log'); // Import the Log model
+const Log = require('../models/Log'); // Your file exists ✅
 
 // Generate JWT
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d',
-  });
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+};
+
+// Normalize role so it always matches your User schema enum
+const normalizeRole = (role) => {
+  const r = role ? String(role).trim().toLowerCase() : 'buyer';
+  if (r === 'buyer' || r === 'seller' || r === 'admin') return r;
+  return 'buyer';
 };
 
 // @desc    Register new user
 // @route   POST /api/auth/register
 // @access  Public
-const registerUser = async (req, res) => {
+const registerUser = asyncHandler(async (req, res) => {
   const { name, email, password, role } = req.body;
 
   if (!name || !email || !password) {
-    return res.status(400).json({ message: 'Please add all fields' });
+    res.status(400);
+    throw new Error('Please add all fields');
   }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const normalizedRole = normalizeRole(role);
 
   // Check if user exists
-  const userExists = await User.findOne({ email });
-
+  const userExists = await User.findOne({ email: normalizedEmail });
   if (userExists) {
-    return res.status(400).json({ message: 'User already exists' });
+    res.status(400);
+    throw new Error('User already exists');
   }
+
+  // ✅ Hash password (required)
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
 
   // Create user
   const user = await User.create({
     name,
-    email,
-    password,
-    role: role || 'Buyer' 
+    email: normalizedEmail,
+    password: hashedPassword,
+    role: normalizedRole,
   });
 
-  if (user) {
-    // Log the event (Optional for registration, but good for tracking)
-    await Log.create({
-      action: 'LOGIN_ATTEMPT',
-      user: user._id,
-      details: `New user registered: ${email}`,
-      ip: req.ip
-    });
-
-    res.status(201).json({
-      _id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id),
-    });
-  } else {
-    res.status(400).json({ message: 'Invalid user data' });
+  if (!user) {
+    res.status(400);
+    throw new Error('Invalid user data');
   }
-};
+
+  // ✅ Logging (use allowed enum values)
+  await Log.create({
+    action: 'LOGIN_ATTEMPT',
+    user: user._id,
+    details: `New user registered: ${normalizedEmail}`,
+    ip: req.ip,
+  });
+
+  res.status(201).json({
+    _id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    token: generateToken(user._id),
+  });
+});
 
 // @desc    Authenticate a user
 // @route   POST /api/auth/login
 // @access  Public
-const loginUser = async (req, res) => {
+const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // Check for user email
-  const user = await User.findOne({ email });
+  if (!email || !password) {
+    res.status(400);
+    throw new Error('Please provide email and password');
+  }
 
-  if (user && (await user.matchPassword(password))) {
-    // SUCCESSFUL LOGIN
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail });
+
+  if (!user) {
+    await Log.create({
+      action: 'LOGIN_ATTEMPT',
+      details: `Failed login attempt (user not found): ${normalizedEmail}`,
+      ip: req.ip,
+    });
+    res.status(401);
+    throw new Error('Invalid credentials');
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+
+  if (!isMatch) {
     await Log.create({
       action: 'LOGIN_ATTEMPT',
       user: user._id,
-      details: `Successful login for ${email}`,
-      ip: req.ip
+      details: `Failed login attempt (wrong password): ${normalizedEmail}`,
+      ip: req.ip,
     });
-
-    res.json({
-      _id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id),
-    });
-  } else {
-    // FAILED LOGIN (Security Requirement: Log unauthorized attempts)
-    await Log.create({
-      action: 'LOGIN_ATTEMPT',
-      details: `Failed login attempt for ${email}`,
-      ip: req.ip
-    });
-
-    res.status(401).json({ message: 'Invalid credentials' });
+    res.status(401);
+    throw new Error('Invalid credentials');
   }
-};
+
+  await Log.create({
+    action: 'LOGIN_ATTEMPT',
+    user: user._id,
+    details: `Successful login: ${normalizedEmail}`,
+    ip: req.ip,
+  });
+
+  res.json({
+    _id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    token: generateToken(user._id),
+  });
+});
 
 module.exports = {
   registerUser,

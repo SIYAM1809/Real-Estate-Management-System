@@ -1,5 +1,7 @@
+// server/routes/propertyRoutes.js
 const express = require('express');
 const router = express.Router();
+
 const {
   getProperties,
   getProperty,
@@ -7,31 +9,32 @@ const {
   updateProperty,
   deleteProperty,
   getMyProperties,
-  getAllPropertiesAdmin, // <--- Import
-  updateStatus,          // <--- Import
+  getAllPropertiesAdmin,
+  updateStatus,
 } = require('../controllers/propertyController');
 
 const { protect } = require('../middleware/authMiddleware');
-const upload = require('../middleware/uploadMiddleware'); // <--- 1. Import Multer
+const { authorize } = require('../middleware/roleMiddleware');
+const upload = require('../middleware/uploadMiddleware');
 
-// Public & General Routes
-router.route('/')
-  .get(getProperties)
-  // 2. THIS IS THE FIX: upload.single('image') allows the server to read the file
-  .post(protect, upload.single('image'), createProperty); 
+// Public
+router.route('/').get(getProperties);
 
-// Seller Route
-router.get('/my-listings', protect, getMyProperties);
+// Seller: create property (pending approval)
+router.post('/', protect, authorize('seller'), upload.single('image'), createProperty);
 
-// --- ADMIN ROUTES ---
-router.get('/admin-all', protect, getAllPropertiesAdmin);
-router.put('/:id/status', protect, updateStatus);
+// Seller: view my listings
+router.get('/my-listings', protect, authorize('seller'), getMyProperties);
 
-// ID Specific Routes
-router
-  .route('/:id')
-  .get(getProperty)
-  .put(protect, updateProperty)
-  .delete(protect, deleteProperty);
+// Admin: view all properties + approve/reject
+router.get('/admin-all', protect, authorize('admin'), getAllPropertiesAdmin);
+router.put('/:id/status', protect, authorize('admin'), updateStatus);
+
+// Public: view one property
+router.get('/:id', getProperty);
+
+// Seller: update/delete own property (controller also checks ownership)
+router.put('/:id', protect, authorize('seller'), updateProperty);
+router.delete('/:id', protect, authorize('seller'), deleteProperty);
 
 module.exports = router;

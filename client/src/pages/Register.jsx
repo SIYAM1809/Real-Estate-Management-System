@@ -1,3 +1,4 @@
+// client/src/pages/Register.jsx
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -7,12 +8,14 @@ import FormInput from '../components/common/FormInput';
 import { FaUserPlus } from 'react-icons/fa';
 
 function Register() {
+  const [didSubmit, setDidSubmit] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'Buyer', // Default role
+    role: 'buyer', // ✅ keep lowercase to match backend enum
   });
 
   const { name, email, password, confirmPassword, role } = formData;
@@ -25,17 +28,25 @@ function Register() {
   );
 
   useEffect(() => {
-    if (isError) {
-      toast.error(message);
+    if (isError) toast.error(message);
+
+    // ✅ If registration succeeded because *we submitted*
+    if (isSuccess && didSubmit) {
+      toast.success('Registration successful ✅');
+
+      // redirect based on role (since your backend returns role lowercase)
+      if (user?.role === 'seller') navigate('/seller-dashboard');
+      else if (user?.role === 'admin') navigate('/admin-dashboard');
+      else navigate('/dashboard');
     }
 
-    if (isSuccess || user) {
-      navigate('/'); // Redirect to Dashboard/Home on success
-      toast.success('Registration Successful!');
+    // ✅ If user is already logged in and they just opened register page
+    if (user && !didSubmit) {
+      navigate('/');
     }
 
     dispatch(reset());
-  }, [user, isError, isSuccess, message, navigate, dispatch]);
+  }, [user, isError, isSuccess, message, navigate, dispatch, didSubmit]);
 
   const onChange = (e) => {
     setFormData((prevState) => ({
@@ -49,15 +60,19 @@ function Register() {
 
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
-    } else {
-      const userData = {
+      return;
+    }
+
+    setDidSubmit(true);
+
+    dispatch(
+      register({
         name,
         email,
         password,
         role,
-      };
-      dispatch(register(userData));
-    }
+      })
+    );
   };
 
   if (isLoading) {
@@ -107,7 +122,6 @@ function Register() {
             placeholder="********"
           />
 
-          {/* Role Selection */}
           <div className="mb-6">
             <label className="block text-gray-700 text-sm font-bold mb-2">
               I am a:
@@ -118,8 +132,8 @@ function Register() {
               onChange={onChange}
               className="w-full border rounded px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="Buyer">Buyer (Looking for property)</option>
-              <option value="Seller">Seller (Listing property)</option>
+              <option value="buyer">Buyer (Looking for property)</option>
+              <option value="seller">Seller (Listing property)</option>
             </select>
           </div>
 
