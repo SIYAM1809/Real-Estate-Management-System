@@ -1,14 +1,8 @@
-// client/src/components/Navbar.jsx
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { logout, reset } from '../features/auth/authSlice';
+import { logout, reset as resetAuth } from '../features/auth/authSlice';
+import { reset as resetFavorites } from '../features/favorites/favoriteSlice';
 import { FaSignOutAlt, FaUser, FaBuilding } from 'react-icons/fa';
-
-const roleHome = (role) => {
-  if (role === 'admin') return '/admin-dashboard';
-  if (role === 'seller') return '/seller-dashboard';
-  return '/dashboard';
-};
 
 function Navbar() {
   const navigate = useNavigate();
@@ -18,7 +12,8 @@ function Navbar() {
 
   const onLogout = () => {
     dispatch(logout());
-    dispatch(reset());
+    dispatch(resetAuth());
+    dispatch(resetFavorites()); // ✅ clears buyer favorites from store
     navigate('/');
   };
 
@@ -38,18 +33,13 @@ function Navbar() {
 
           {user ? (
             <>
-              <li className="flex items-center gap-3">
-                <span className="text-sm text-gray-400">Hello, {user.name}</span>
-
+              <li>
+                <span className="text-sm text-gray-400 mr-2">Hello, {user.name}</span>
                 <Link
-                  to={roleHome(user.role)}
+                  to={user.role === 'admin' ? '/admin-dashboard' : user.role === 'seller' ? '/seller-dashboard' : '/dashboard'}
                   className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
                 >
-                  {user.role === 'admin'
-                    ? 'Admin Dashboard'
-                    : user.role === 'seller'
-                    ? 'Seller Dashboard'
-                    : 'Dashboard'}
+                  {user.role === 'admin' ? 'Admin Panel' : user.role === 'seller' ? 'Seller Panel' : 'Dashboard'}
                 </Link>
               </li>
 

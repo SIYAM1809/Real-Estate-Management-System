@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { getProperties, reset } from '../features/properties/propertySlice';
-import { getFavorites } from '../features/favorites/favoriteSlice'; // <--- IMPORT ADDED
+import { getFavorites } from '../features/favorites/favoriteSlice';
 import PropertyItem from '../components/properties/PropertyItem';
 import { FaSearch, FaFilter } from 'react-icons/fa';
 import axios from 'axios';
@@ -18,13 +17,14 @@ function Properties() {
 
   const [displayProperties, setDisplayProperties] = useState([]);
   const [loading, setLoading] = useState(false);
-  const { user } = useSelector((state) => state.auth); // Get user to check if we should load favorites
+
+  const { user } = useSelector((state) => state.auth);
 
   useEffect(() => {
     fetchFilteredProperties();
-    
-    // Only fetch favorites if user is logged in
-    if (user) {
+
+    // ✅ Favorites should be loaded ONLY for buyer accounts
+    if (user?.role === 'buyer') {
       dispatch(getFavorites());
     }
   }, [dispatch, user]);
@@ -32,13 +32,14 @@ function Properties() {
   const fetchFilteredProperties = async () => {
     setLoading(true);
     try {
-      let queryStr = `http://localhost:5000/api/properties?keyword=${filters.keyword}&city=${filters.city}&category=${filters.category}&maxPrice=${filters.maxPrice}`;
+      const queryStr = `http://localhost:5000/api/properties?keyword=${filters.keyword}&city=${filters.city}&category=${filters.category}&maxPrice=${filters.maxPrice}`;
       const response = await axios.get(queryStr);
       setDisplayProperties(response.data);
     } catch (error) {
-      console.error("Search Error:", error);
+      console.error('Search Error:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSearch = (e) => {
@@ -55,8 +56,6 @@ function Properties() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      
-      {/* SEARCH BAR */}
       <div className="bg-white p-6 rounded-xl shadow-md mb-10 border border-gray-100">
         <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <div className="md:col-span-2">
@@ -73,6 +72,7 @@ function Properties() {
               />
             </div>
           </div>
+
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">City</label>
             <input
@@ -84,6 +84,7 @@ function Properties() {
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">Type</label>
             <select
@@ -98,8 +99,12 @@ function Properties() {
               <option value="Commercial">Commercial</option>
             </select>
           </div>
+
           <div>
-            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-2 rounded-lg flex items-center justify-center gap-2">
+            <button
+              type="submit"
+              className="w-full bg-blue-600 text-white font-bold py-2 rounded-lg flex items-center justify-center gap-2"
+            >
               <FaFilter /> Search
             </button>
           </div>

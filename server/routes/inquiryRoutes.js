@@ -1,10 +1,15 @@
+// server/routes/inquiryRoutes.js
 const express = require('express');
 const router = express.Router();
+
 const { createInquiry, getMyInquiries } = require('../controllers/inquiryController');
 const { protect } = require('../middleware/authMiddleware');
+const { authorize } = require('../middleware/roleMiddleware');
 
-// All inquiry routes are protected (Must be logged in)
-router.post('/', protect, createInquiry);
-router.get('/my-inquiries', protect, getMyInquiries);
+// ✅ Buyer only: send inquiry/message/appointment
+router.post('/', protect, authorize('buyer'), createInquiry);
+
+// ✅ Seller only: see inbox (inquiries sent to seller)
+router.get('/my-inquiries', protect, authorize('seller'), getMyInquiries);
 
 module.exports = router;

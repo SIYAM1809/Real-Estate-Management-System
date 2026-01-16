@@ -1,21 +1,23 @@
 const express = require('express');
 const router = express.Router();
+
 const {
   registerUser,
   loginUser,
   getMe,
-  toggleFavorite, // <--- MUST be imported
-  getFavorites,   // <--- MUST be imported
+  toggleFavorite,
+  getFavorites,
 } = require('../controllers/userController');
-const { protect } = require('../middleware/authMiddleware');
 
-// 1. Existing Routes
+const { protect } = require('../middleware/authMiddleware');
+const { authorize } = require('../middleware/roleMiddleware');
+
 router.post('/', registerUser);
 router.post('/login', loginUser);
 router.get('/me', protect, getMe);
 
-// 2. NEW FAVORITES ROUTES (The Missing Door)
-router.put('/favorites/:id', protect, toggleFavorite); 
-router.get('/favorites', protect, getFavorites);
+// ✅ Buyer-only
+router.put('/favorites/:id', protect, authorize('buyer'), toggleFavorite);
+router.get('/favorites', protect, authorize('buyer'), getFavorites);
 
 module.exports = router;

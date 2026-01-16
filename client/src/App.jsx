@@ -1,8 +1,8 @@
-// client/src/App.jsx
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+// PAGES
 import Dashboard from './pages/Dashboard';
 import AddProperty from './pages/AddProperty';
 import Properties from './pages/Properties';
@@ -13,6 +13,7 @@ import PropertyDetails from './pages/PropertyDetails';
 import AdminDashboard from './pages/dashboard/AdminDashboard';
 import SellerDashboard from './pages/dashboard/SellerDashboard';
 
+// COMPONENTS
 import Navbar from './components/Navbar';
 import PrivateRoute from './components/PrivateRoute';
 
@@ -24,14 +25,14 @@ function App() {
           <Navbar />
 
           <Routes>
+            {/* Public */}
             <Route path="/" element={<Home />} />
             <Route path="/properties" element={<Properties />} />
             <Route path="/property/:id" element={<PropertyDetails />} />
-
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
-            {/* Buyer Dashboard (Protected) */}
+            {/* Buyer only */}
             <Route
               path="/dashboard"
               element={
@@ -41,7 +42,7 @@ function App() {
               }
             />
 
-            {/* Seller-only */}
+            {/* Seller only */}
             <Route
               path="/seller-dashboard"
               element={
@@ -59,7 +60,7 @@ function App() {
               }
             />
 
-            {/* Admin-only */}
+            {/* Admin only */}
             <Route
               path="/admin-dashboard"
               element={
@@ -69,14 +70,15 @@ function App() {
               }
             />
 
-            {/* Optional: keep old /admin route but force it to admin dashboard */}
-            <Route
-              path="/admin"
-              element={<PrivateRoute allowedRoles={['admin']}><AdminDashboard /></PrivateRoute>}
-            />
+            {/* ✅ remove old /admin (was unprotected). If you want it, redirect safely */}
+            <Route path="/admin" element={<Navigate to="/admin-dashboard" replace />} />
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </Router>
+
       <ToastContainer />
     </>
   );

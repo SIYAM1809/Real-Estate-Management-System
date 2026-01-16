@@ -4,16 +4,6 @@ const bcrypt = require('bcryptjs');
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
-};
-
-const normalizeRole = (role) => {
-  const r = role ? String(role).trim().toLowerCase() : 'buyer';
-  if (r === 'buyer' || r === 'seller' || r === 'admin') return r;
-  return 'buyer';
-};
-
 // @desc    Register new user
 // @route   POST /api/users
 // @access  Public
@@ -26,7 +16,7 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   const normalizedEmail = String(email).trim().toLowerCase();
-  const normalizedRole = normalizeRole(role);
+  const normalizedRole = role ? String(role).trim().toLowerCase() : 'buyer';
 
   const userExists = await User.findOne({ email: normalizedEmail });
   if (userExists) {
@@ -74,11 +64,10 @@ const loginUser = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email: normalizedEmail });
   if (!user) {
     res.status(400);
-    throw new Error('Invalid credentials (User not found)');
+    throw new Error('Invalid credentials');
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
-
   if (!isMatch) {
     res.status(400);
     throw new Error('Invalid credentials');
@@ -100,44 +89,71 @@ const getMe = asyncHandler(async (req, res) => {
   res.status(200).json(req.user);
 });
 
-// @desc    Toggle favorite
+// @desc    Add or Remove property from favorites (BUYER ONLY)
 // @route   PUT /api/users/favorites/:id
 // @access  Private
 const toggleFavorite = async (req, res) => {
   try {
+    if (!req.user || req.user.role !== 'buyer') {
+      return res.status(403).json({ message: 'Favorites are available for buyers only.' });
+    }
+
     const user = await User.findById(req.user.id);
     const propertyId = req.params.id;
 
+    if (!user) {
+      return res.status(401).json({ message: 'Not authorized (user missing)' });
+    }
+
     const index = user.favorites.findIndex((id) => id.toString() === propertyId);
 
-    if (index !== -1) user.favorites.splice(index, 1);
-    else user.favorites.push(propertyId);
+    let isAdded = false;
+    if (index !== -1) {
+      user.favorites.splice(index, 1);
+      isAdded = false;
+    } else {
+      user.favorites.push(propertyId);
+      isAdded = true;
+    }
 
     await user.save();
 
     const updatedUser = await User.findById(req.user.id).populate('favorites');
 
-    res.status(200).json({
-      message: index !== -1 ? 'Removed from favorites' : 'Added to favorites',
+    return res.status(200).json({
+      message: isAdded ? 'Added to favorites' : 'Removed from favorites',
       favorites: updatedUser.favorites,
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    return res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// @desc    Get favorites
+// @desc    Get user favorites (BUYER ONLY)
 // @route   GET /api/users/favorites
 // @access  Private
 const getFavorites = async (req, res) => {
   try {
+    if (!req.user || req.user.role !== 'buyer') {
+      return res.status(403).json({ message: 'Favorites are available for buyers only.' });
+    }
+
     const user = await User.findById(req.user.id).populate('favorites');
-    res.status(200).json(user.favorites);
+    if (!user) {
+      return res.status(401).json({ message: 'Not authorized (user missing)' });
+    }
+
+    return res.status(200).json(user.favorites);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    return res.status(500).json({ message: 'Server Error' });
   }
+};
+
+// Generate JWT
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
 
 module.exports = {
