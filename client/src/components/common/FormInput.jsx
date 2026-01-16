@@ -1,3 +1,5 @@
+import React from 'react';
+
 function FormInput({ label, type, name, value, onChange, placeholder }) {
   return (
     <div className="mb-4">

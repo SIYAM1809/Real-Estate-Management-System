@@ -13,20 +13,26 @@ connectDB();
 const app = express();
 
 // Middleware
-app.use(cors()); // Allows frontend to talk to backend
-app.use(express.json()); // Allows us to parse JSON bodies (req.body)
+app.use(cors()); 
+app.use(express.json()); 
 app.use(express.urlencoded({ extended: false }));
+
+// --- ROUTE DEFINITIONS ---
+app.use('/api/inquiries', require('./routes/inquiryRoutes'));
+app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/properties', require('./routes/propertyRoutes'));
+
+// 1. ADD THIS MISSING LINE:
+app.use('/api/users', require('./routes/userRoutes')); 
+// -------------------------
 
 // Simple Route to check if server is working
 app.get('/', (req, res) => {
   res.status(200).json({ message: 'Real Estate Management System API is running' });
 });
 
-// Routes
-app.use('/api/admin', require('./routes/adminRoutes'));
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/properties', require('./routes/propertyRoutes'));
-// Error Handling Middleware (Basic)
+// Error Handling Middleware
 app.use((err, req, res, next) => {
   const statusCode = res.statusCode ? res.statusCode : 500;
   res.status(statusCode);
