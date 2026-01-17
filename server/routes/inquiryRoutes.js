@@ -5,23 +5,27 @@ const router = express.Router();
 const {
   createInquiry,
   getMyInquiries,
-  respondToAppointment,
-  getMyRequests,
+  getMySentInquiries,
+  sellerActionOnAppointment,
+  buyerRespondToAppointment,
 } = require('../controllers/inquiryController');
 
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 
-// Buyer only: send inquiry (message/appointment request)
+// ✅ Buyer only: send inquiry/message/appointment
 router.post('/', protect, authorize('buyer'), createInquiry);
 
-// Seller only: inbox (inquiries sent to seller)
+// ✅ Seller only: see inbox (inquiries sent to seller)
 router.get('/my-inquiries', protect, authorize('seller'), getMyInquiries);
 
-// Seller only: respond to appointment requests
-router.put('/:id/appointment-response', protect, authorize('seller'), respondToAppointment);
+// ✅ Buyer only: see what buyer sent (so buyer can accept/reject seller proposal)
+router.get('/my-sent', protect, authorize('buyer'), getMySentInquiries);
 
-// Buyer only: view their sent inquiries/appointments (for “My Requests” UI)
-router.get('/my-requests', protect, authorize('buyer'), getMyRequests);
+// ✅ Seller only: propose/accept_requested/reject appointment
+router.put('/:id/seller-action', protect, authorize('seller'), sellerActionOnAppointment);
+
+// ✅ Buyer only: accept/reject seller proposal
+router.put('/:id/buyer-response', protect, authorize('buyer'), buyerRespondToAppointment);
 
 module.exports = router;

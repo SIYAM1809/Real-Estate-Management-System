@@ -3,6 +3,7 @@ import authReducer from '../features/auth/authSlice';
 import propertyReducer from '../features/properties/propertySlice';
 import inquiryReducer from '../features/inquiries/inquirySlice';
 import favoriteReducer from '../features/favorites/favoriteSlice'; // <--- Ensure this path is correct
+import reviewReducer from '../features/reviews/reviewSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,5 +11,7 @@ export const store = configureStore({
     properties: propertyReducer,
     inquiries: inquiryReducer,
     favorites: favoriteReducer,
+    reviews: reviewReducer, // ✅ add
+
   },
 });

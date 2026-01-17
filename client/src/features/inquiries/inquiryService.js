@@ -6,39 +6,48 @@ const authConfig = (token) => ({
   headers: { Authorization: `Bearer ${token}` },
 });
 
-// Create new inquiry
+// Buyer: create new inquiry
 const createInquiry = async (inquiryData, token) => {
   const response = await axios.post(API_URL, inquiryData, authConfig(token));
   return response.data;
 };
 
-// Seller inbox
+// Seller: inbox
 const getMyInquiries = async (token) => {
   const response = await axios.get(API_URL + 'my-inquiries', authConfig(token));
   return response.data;
 };
 
-// Buyer requests (appointments/messages sent by buyer)
-const getMyRequests = async (token) => {
-  const response = await axios.get(API_URL + 'my-requests', authConfig(token));
+// Buyer: sent inquiries
+const getMySentInquiries = async (token) => {
+  const response = await axios.get(API_URL + 'my-sent', authConfig(token));
   return response.data;
 };
 
-// Seller responds to appointment
-const respondToAppointment = async (inquiryId, payload, token) => {
+// Seller: propose / accept_requested / reject
+const sellerAction = async (inquiryId, payload, token) => {
   const response = await axios.put(
-    API_URL + `${inquiryId}/appointment-response`,
+    API_URL + `${inquiryId}/seller-action`,
     payload,
     authConfig(token)
   );
-  return response.data; // expected: { message, inquiry }
+  return response.data;
 };
 
-const inquiryService = {
+// Buyer: accept / reject
+const buyerRespond = async (inquiryId, payload, token) => {
+  const response = await axios.put(
+    API_URL + `${inquiryId}/buyer-response`,
+    payload,
+    authConfig(token)
+  );
+  return response.data;
+};
+
+export default {
   createInquiry,
   getMyInquiries,
-  getMyRequests,
-  respondToAppointment,
+  getMySentInquiries,
+  sellerAction,
+  buyerRespond,
 };
-
-export default inquiryService;

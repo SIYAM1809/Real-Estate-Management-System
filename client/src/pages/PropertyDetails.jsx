@@ -3,6 +3,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getProperty } from '../features/properties/propertySlice';
 import { createInquiry, reset as resetInquiry } from '../features/inquiries/inquirySlice';
+import { getPropertyReviews, createReview as createReviewAction } from '../features/reviews/reviewSlice';
+import { FaStar } from 'react-icons/fa';
+
+
 import {
   FaBed,
   FaMapMarkerAlt,
@@ -18,12 +22,20 @@ function PropertyDetails() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
+  const [rating, setRating] = useState(5);
+  const [reviewText, setReviewText] = useState('');
+  const { propertyReviews, isError: reviewError, message: reviewMsg, isSuccess: reviewSuccess } =
+  useSelector((state) => state.reviews);
+
+
+
   const [message, setMessage] = useState('');
   const [showForm, setShowForm] = useState(false);
 
   const [inquiryType, setInquiryType] = useState('message');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  const [place, setPlace] = useState(''); // ✅ NEW
 
   const { property, isLoading, isError, message: errorMsg } = useSelector(
     (state) => state.properties
@@ -48,11 +60,12 @@ function PropertyDetails() {
       dispatch(resetInquiry());
     }
     if (inquirySuccess) {
-      toast.success('Message sent to seller ✅');
+      toast.success('Sent ✅');
       setShowForm(false);
       setMessage('');
       setDate('');
       setTime('');
+      setPlace('');
       setInquiryType('message');
       dispatch(resetInquiry());
     }
@@ -67,7 +80,6 @@ function PropertyDetails() {
       return;
     }
 
-    // ✅ Hard block non-buyers (UI + backend will both enforce)
     if (!isBuyer) {
       toast.error('Only buyers can send inquiries.');
       return;
@@ -83,13 +95,12 @@ function PropertyDetails() {
       propertyId: property._id,
       type: inquiryType,
 
-      // ✅ new (preferred)
-      requestedDate: inquiryType === 'appointment' ? date : undefined,
-      requestedTime: inquiryType === 'appointment' ? time : undefined,
-
-      // ✅ old (compat)
+      // ✅ keep old keys (backend supports)
       appointmentDate: inquiryType === 'appointment' ? date : undefined,
       appointmentTime: inquiryType === 'appointment' ? time : undefined,
+
+      // ✅ new optional place
+      requestedPlace: inquiryType === 'appointment' ? place : undefined,
     };
 
     dispatch(createInquiry(data));
@@ -154,7 +165,6 @@ function PropertyDetails() {
               <p className="font-bold text-lg text-gray-800">{property.seller?.name}</p>
             </div>
 
-            {/* ✅ Buyer-only Contact */}
             {!isLoggedIn ? (
               <button
                 onClick={() => {
@@ -203,28 +213,43 @@ function PropertyDetails() {
                 </div>
 
                 {inquiryType === 'appointment' && (
-                  <div className="grid grid-cols-2 gap-2">
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500">Date</label>
+                        <input
+                          type="date"
+                          className="w-full p-2 border rounded"
+                          required
+                          value={date}
+                          onChange={(e) => setDate(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500">Time</label>
+                        <input
+                          type="time"
+                          className="w-full p-2 border rounded"
+                          required
+                          value={time}
+                          onChange={(e) => setTime(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="text-xs font-bold text-gray-500">Date</label>
+                      <label className="text-xs font-bold text-gray-500">
+                        Preferred meeting place (optional)
+                      </label>
                       <input
-                        type="date"
+                        type="text"
                         className="w-full p-2 border rounded"
-                        required
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
+                        value={place}
+                        onChange={(e) => setPlace(e.target.value)}
+                        placeholder="e.g., In front of building gate / office / etc."
                       />
                     </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-500">Time</label>
-                      <input
-                        type="time"
-                        className="w-full p-2 border rounded"
-                        required
-                        value={time}
-                        onChange={(e) => setTime(e.target.value)}
-                      />
-                    </div>
-                  </div>
+                  </>
                 )}
 
                 <label className="text-sm font-bold text-gray-700">Additional Note</label>
@@ -233,7 +258,7 @@ function PropertyDetails() {
                   rows="3"
                   placeholder={
                     inquiryType === 'appointment'
-                      ? 'I would like to see the backyard...'
+                      ? 'Any preference or note...'
                       : 'Is the price negotiable?'
                   }
                   value={message}

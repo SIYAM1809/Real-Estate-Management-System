@@ -1,113 +1,195 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
 import { getFavorites } from '../../features/favorites/favoriteSlice';
-import { getMyRequests } from '../../features/inquiries/inquirySlice';
+import {
+  getMySentInquiries,
+  buyerRespondToAppointment,
+} from '../../features/inquiries/inquirySlice';
 import PropertyItem from '../../components/properties/PropertyItem';
+import { toast } from 'react-toastify';
 
 function BuyerDashboard() {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const [tab, setTab] = useState('favorites');
-
   const { user } = useSelector((state) => state.auth);
+
   const { favorites = [] } = useSelector((state) => state.favorites) || {};
-  const { requests = [] } = useSelector((state) => state.inquiries) || {};
+  const { sentInquiries = [] } = useSelector((state) => state.inquiries) || {};
+
+  const isBuyer = user?.role === 'buyer';
 
   useEffect(() => {
-    if (!user) navigate('/login');
-    else if (user.role !== 'buyer') navigate('/dashboard');
-    else {
-      dispatch(getFavorites());
-      dispatch(getMyRequests());
+    if (!isBuyer) return;
+    dispatch(getFavorites());
+    dispatch(getMySentInquiries());
+  }, [dispatch, isBuyer]);
+
+  const respond = async (inqId, action) => {
+    const res = await dispatch(
+      buyerRespondToAppointment({
+        inquiryId: inqId,
+        payload: { action }, // 'accept' | 'reject'
+      })
+    );
+
+    if (res.meta.requestStatus === 'fulfilled') {
+      toast.success(res.payload?.message || 'Updated');
     }
-  }, [dispatch, user, navigate]);
+  };
+
+  const badge = (status) => {
+    const s = status || 'pending';
+    const cls =
+      s === 'buyer_accepted'
+        ? 'bg-green-200 text-green-800'
+        : s === 'buyer_rejected' || s === 'seller_rejected'
+        ? 'bg-red-200 text-red-800'
+        : s === 'proposed'
+        ? 'bg-blue-200 text-blue-800'
+        : 'bg-yellow-200 text-yellow-800';
+
+    return (
+      <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${cls}`}>
+        {s.replace('_', ' ')}
+      </span>
+    );
+  };
+
+  const appointmentOnly = sentInquiries.filter((x) => x.type === 'appointment');
 
   return (
     <div className="container mx-auto p-6 min-h-screen bg-gray-50">
-      <div className="mb-6">
+      <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-800">Buyer Dashboard</h1>
         <p className="text-gray-500">Welcome back, {user?.name}</p>
       </div>
 
-      <div className="flex gap-4 mb-6 border-b pb-2">
-        <button
-          onClick={() => setTab('favorites')}
-          className={`font-bold px-2 pb-2 ${tab === 'favorites' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500'}`}
-        >
-          ❤️ Favorites
-        </button>
-        <button
-          onClick={() => setTab('requests')}
-          className={`font-bold px-2 pb-2 ${tab === 'requests' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500'}`}
-        >
-          📅 My Requests
-        </button>
+      {/* FAVORITES */}
+      <div className="bg-white p-8 rounded-xl shadow-md border border-gray-100 mb-8">
+        <div className="flex items-center gap-2 mb-6 border-b pb-4">
+          <span className="text-2xl">❤️</span>
+          <h2 className="text-xl font-bold text-gray-800">My Favorite Homes</h2>
+        </div>
+
+        {favorites && favorites.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {favorites.map((fav) => (fav && fav._id ? <PropertyItem key={fav._id} property={fav} /> : null))}
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+            <p className="text-gray-500 text-lg mb-2">You haven't liked any properties yet.</p>
+            <p className="text-sm text-gray-400">Browse homes and click the heart icon to save them here.</p>
+          </div>
+        )}
       </div>
 
-      {tab === 'favorites' && (
-        <div className="bg-white p-8 rounded-xl shadow-md border border-gray-100">
-          <h2 className="text-xl font-bold mb-6">My Favorite Homes</h2>
-
-          {favorites && favorites.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {favorites.map((fav) => (fav && fav._id ? <PropertyItem key={fav._id} property={fav} /> : null))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-              <p className="text-gray-500 text-lg mb-2">You haven't liked any properties yet.</p>
-            </div>
-          )}
+      {/* APPOINTMENTS */}
+      <div className="bg-white p-8 rounded-xl shadow-md border border-gray-100">
+        <div className="flex items-center gap-2 mb-6 border-b pb-4">
+          <span className="text-2xl">📅</span>
+          <h2 className="text-xl font-bold text-gray-800">My Appointment Requests</h2>
         </div>
-      )}
 
-      {tab === 'requests' && (
-        <div className="bg-white p-8 rounded-xl shadow-md border border-gray-100">
-          <h2 className="text-xl font-bold mb-6">My Appointment Requests</h2>
+        {appointmentOnly.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+            <p className="text-gray-500 text-lg mb-2">No appointment requests yet.</p>
+            <p className="text-sm text-gray-400">Request a visit from any property details page.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {appointmentOnly.map((inq) => {
+              const reqDate = inq?.appointment?.requestedDate || inq?.appointmentDate || '';
+              const reqTime = inq?.appointment?.requestedTime || inq?.appointmentTime || '';
+              const reqPlace = inq?.appointment?.requestedPlace || '';
 
-          {requests.length > 0 ? (
-            <div className="space-y-4">
-              {requests.map((r) => {
-                const requestedDate = r.appointment?.requestedDate || r.appointmentDate;
-                const requestedTime = r.appointment?.requestedTime || r.appointmentTime;
-                const scheduledDate = r.appointment?.scheduledDate;
-                const scheduledTime = r.appointment?.scheduledTime;
-                const meetingPlace = r.appointment?.meetingPlace;
-                const status = r.status || (r.type === 'appointment' ? 'pending' : 'new');
+              const propDate = inq?.appointment?.proposedDate || '';
+              const propTime = inq?.appointment?.proposedTime || '';
+              const propPlace = inq?.appointment?.proposedPlace || '';
+              const sellerNote = inq?.appointment?.sellerNote || '';
 
-                return (
-                  <div key={r._id} className="border rounded-lg p-4 bg-gray-50">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-bold text-gray-800">{r.property?.title || 'Property'}</div>
-                        <div className="text-sm text-gray-500">Seller: {r.seller?.name || 'Unknown'}</div>
+              return (
+                <div key={inq._id} className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-bold text-gray-800">{inq.property?.title}</div>
+                      <div className="text-sm text-gray-600">
+                        Seller: <span className="font-semibold">{inq.seller?.name}</span>
                       </div>
-                      <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                        {status.replaceAll('_', ' ').toUpperCase()}
-                      </span>
+                      <div className="mt-2">{badge(inq.status)}</div>
                     </div>
-
-                    <div className="mt-2 text-sm">
-                      <div><span className="font-bold">Your preference:</span> {requestedDate || '—'} {requestedTime || ''}</div>
-                      {scheduledDate && scheduledTime ? (
-                        <div className="mt-2 p-2 bg-white border rounded">
-                          <div className="font-bold">Scheduled:</div>
-                          <div>{scheduledDate} at {scheduledTime}</div>
-                          {meetingPlace && <div className="text-gray-600">Place: {meetingPlace}</div>}
-                        </div>
-                      ) : (
-                        <div className="text-gray-500 mt-2">Waiting for seller response…</div>
-                      )}
+                    <div className="text-xs text-gray-500">
+                      {new Date(inq.createdAt).toLocaleDateString()}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-gray-500">No requests yet.</div>
-          )}
-        </div>
-      )}
+
+                  <div className="mt-3 text-sm">
+                    <div>
+                      <span className="font-semibold">Requested:</span> {reqDate} {reqTime}
+                    </div>
+                    {reqPlace ? (
+                      <div>
+                        <span className="font-semibold">Preferred place:</span> {reqPlace}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {inq.status === 'proposed' && (
+                    <div className="mt-3 bg-white border rounded p-3">
+                      <div className="font-bold text-gray-800 mb-1">Seller Proposal</div>
+                      <div className="text-sm">
+                        <div>
+                          <span className="font-semibold">Date:</span> {propDate || '—'} |{' '}
+                          <span className="font-semibold">Time:</span> {propTime || '—'}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Place:</span> {propPlace || '—'}
+                        </div>
+                        {sellerNote ? (
+                          <div className="mt-2">
+                            <span className="font-semibold">Note:</span> {sellerNote}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => respond(inq._id, 'accept')}
+                          className="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => respond(inq._id, 'reject')}
+                          className="flex-1 bg-red-600 text-white py-2 rounded hover:bg-red-700"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {inq.status === 'buyer_accepted' && (
+                    <div className="mt-3 text-green-700 font-bold">
+                      ✅ Confirmed. See you at {propPlace || 'the agreed place'}.
+                    </div>
+                  )}
+
+                  {inq.status === 'seller_rejected' && (
+                    <div className="mt-3 text-red-700 font-bold">
+                      ❌ Seller rejected this request.
+                    </div>
+                  )}
+
+                  {inq.status === 'buyer_rejected' && (
+                    <div className="mt-3 text-red-700 font-bold">
+                      ❌ You rejected the seller proposal.
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,22 +2,20 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import inquiryService from './inquiryService';
 
 const initialState = {
-  inquiries: [],     // seller inbox
-  requests: [],      // buyer "my requests"
+  inquiries: [],       // seller inbox
+  sentInquiries: [],   // buyer sent list
   isError: false,
   isSuccess: false,
   isLoading: false,
   message: '',
 };
 
-const getToken = (thunkAPI) => thunkAPI.getState()?.auth?.user?.token;
-
-// Create new inquiry (buyer)
+// Buyer: create inquiry
 export const createInquiry = createAsyncThunk(
   'inquiries/create',
   async (inquiryData, thunkAPI) => {
     try {
-      const token = getToken(thunkAPI);
+      const token = thunkAPI.getState().auth.user.token;
       return await inquiryService.createInquiry(inquiryData, token);
     } catch (error) {
       const message =
@@ -29,12 +27,12 @@ export const createInquiry = createAsyncThunk(
   }
 );
 
-// Seller inbox
+// Seller: inbox
 export const getMyInquiries = createAsyncThunk(
-  'inquiries/getMyInquiries',
+  'inquiries/getSellerInbox',
   async (_, thunkAPI) => {
     try {
-      const token = getToken(thunkAPI);
+      const token = thunkAPI.getState().auth.user.token;
       return await inquiryService.getMyInquiries(token);
     } catch (error) {
       const message =
@@ -46,13 +44,13 @@ export const getMyInquiries = createAsyncThunk(
   }
 );
 
-// Buyer requests
-export const getMyRequests = createAsyncThunk(
-  'inquiries/getMyRequests',
+// Buyer: sent
+export const getMySentInquiries = createAsyncThunk(
+  'inquiries/getBuyerSent',
   async (_, thunkAPI) => {
     try {
-      const token = getToken(thunkAPI);
-      return await inquiryService.getMyRequests(token);
+      const token = thunkAPI.getState().auth.user.token;
+      return await inquiryService.getMySentInquiries(token);
     } catch (error) {
       const message =
         (error.response && error.response.data && error.response.data.message) ||
@@ -63,13 +61,30 @@ export const getMyRequests = createAsyncThunk(
   }
 );
 
-// Seller responds to appointment
-export const respondToAppointment = createAsyncThunk(
-  'inquiries/respondToAppointment',
+// Seller: propose/accept_requested/reject
+export const sellerActionOnAppointment = createAsyncThunk(
+  'inquiries/sellerAction',
   async ({ inquiryId, payload }, thunkAPI) => {
     try {
-      const token = getToken(thunkAPI);
-      return await inquiryService.respondToAppointment(inquiryId, payload, token);
+      const token = thunkAPI.getState().auth.user.token;
+      return await inquiryService.sellerAction(inquiryId, payload, token);
+    } catch (error) {
+      const message =
+        (error.response && error.response.data && error.response.data.message) ||
+        error.message ||
+        error.toString();
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// Buyer: accept/reject
+export const buyerRespondToAppointment = createAsyncThunk(
+  'inquiries/buyerRespond',
+  async ({ inquiryId, payload }, thunkAPI) => {
+    try {
+      const token = thunkAPI.getState().auth.user.token;
+      return await inquiryService.buyerRespond(inquiryId, payload, token);
     } catch (error) {
       const message =
         (error.response && error.response.data && error.response.data.message) ||
@@ -84,11 +99,16 @@ export const inquirySlice = createSlice({
   name: 'inquiries',
   initialState,
   reducers: {
-    reset: () => initialState,
+    reset: (state) => {
+      state.isLoading = false;
+      state.isSuccess = false;
+      state.isError = false;
+      state.message = '';
+    },
   },
   extraReducers: (builder) => {
     builder
-      // create
+      // create inquiry
       .addCase(createInquiry.pending, (state) => {
         state.isLoading = true;
       })
@@ -117,36 +137,54 @@ export const inquirySlice = createSlice({
         state.message = action.payload;
       })
 
-      // buyer requests
-      .addCase(getMyRequests.pending, (state) => {
+      // buyer sent
+      .addCase(getMySentInquiries.pending, (state) => {
         state.isLoading = true;
       })
-      .addCase(getMyRequests.fulfilled, (state, action) => {
+      .addCase(getMySentInquiries.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
-        state.requests = action.payload;
+        state.sentInquiries = action.payload;
       })
-      .addCase(getMyRequests.rejected, (state, action) => {
+      .addCase(getMySentInquiries.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
       })
 
-      // seller respond
-      .addCase(respondToAppointment.pending, (state) => {
+      // seller action
+      .addCase(sellerActionOnAppointment.pending, (state) => {
         state.isLoading = true;
       })
-      .addCase(respondToAppointment.fulfilled, (state, action) => {
+      .addCase(sellerActionOnAppointment.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
 
-        // update seller inbox list in-place if present
         const updated = action.payload?.inquiry;
-        if (updated) {
+        if (updated?._id) {
           state.inquiries = state.inquiries.map((x) => (x._id === updated._id ? updated : x));
         }
       })
-      .addCase(respondToAppointment.rejected, (state, action) => {
+      .addCase(sellerActionOnAppointment.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+
+      // buyer response
+      .addCase(buyerRespondToAppointment.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(buyerRespondToAppointment.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isSuccess = true;
+
+        const updated = action.payload?.inquiry;
+        if (updated?._id) {
+          state.sentInquiries = state.sentInquiries.map((x) => (x._id === updated._id ? updated : x));
+        }
+      })
+      .addCase(buyerRespondToAppointment.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;

@@ -1,3 +1,4 @@
+// server/models/User.js
 const mongoose = require('mongoose');
 
 const userSchema = mongoose.Schema(
@@ -18,14 +19,15 @@ const userSchema = mongoose.Schema(
     role: {
       type: String,
       enum: ['buyer', 'seller', 'admin'], 
-      default: 'buyer', // Default to buyer
+      default: 'buyer',
     },
-    // --- NEW: The Wishlist ---
     favorites: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Property',
     }],
-    // -------------------------
+    // ✅ Change type to Number for timestamp
+    resetPasswordToken: { type: String },
+    resetPasswordExpire: { type: Number }, // Changed from Date to Number
   },
   {
     timestamps: true,

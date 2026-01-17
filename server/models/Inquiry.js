@@ -1,65 +1,60 @@
-// server/models/Inquiry.js
 const mongoose = require('mongoose');
 
 const inquirySchema = mongoose.Schema(
   {
-    buyer: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'User', 
+    buyer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
       required: true,
-      index: true
     },
-    seller: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'User', 
+    seller: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
       required: true,
-      index: true
     },
-    property: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'Property', 
+    property: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Property',
       required: true,
-      index: true
     },
 
-    message: { 
-      type: String, 
+    message: {
+      type: String,
       required: [true, 'Please add a message'],
-      trim: true
     },
-    
-    email: { 
-      type: String, 
+    email: {
+      type: String,
       required: true,
-      trim: true,
-      lowercase: true
     },
 
     type: {
       type: String,
       enum: ['message', 'appointment'],
       default: 'message',
-      index: true
     },
 
-    // ✅ appointment workflow
+    // ✅ BACKWARD COMPATIBILITY (your existing UI uses these)
+    appointmentDate: { type: String }, // buyer requested date
+    appointmentTime: { type: String }, // buyer requested time
+
+    // ✅ NEW: appointment state machine
     status: {
       type: String,
       enum: ['pending', 'proposed', 'seller_rejected', 'buyer_accepted', 'buyer_rejected'],
       default: 'pending',
-      index: true
     },
 
+    // ✅ NEW: structured appointment data
     appointment: {
       // buyer request
       requestedDate: String,
       requestedTime: String,
-      requestedPlace: String, // ✅ buyer optional
+      requestedPlace: String,
 
-      // seller proposal / final offer
+      // seller response / proposal
       proposedDate: String,
       proposedTime: String,
-      proposedPlace: String,  // ✅ seller sets final place
+      proposedPlace: String,
       sellerNote: String,
 
       // buyer response note (optional)
@@ -68,8 +63,5 @@ const inquirySchema = mongoose.Schema(
   },
   { timestamps: true }
 );
-
-// prevent duplicated spam per buyer+property+type (message vs appointment)
-inquirySchema.index({ buyer: 1, property: 1, type: 1 }, { unique: true });
 
 module.exports = mongoose.model('Inquiry', inquirySchema);

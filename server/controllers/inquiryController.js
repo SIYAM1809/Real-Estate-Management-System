@@ -1,5 +1,4 @@
 // server/controllers/inquiryController.js
-const mongoose = require('mongoose');
 const Inquiry = require('../models/Inquiry');
 const Property = require('../models/Property');
 
@@ -12,89 +11,95 @@ const createInquiry = async (req, res) => {
       return res.status(403).json({ message: 'Only buyers can send inquiries.' });
     }
 
-    const { message, propertyId, requestedDate, requestedTime, type } = req.body;
+    const {
+      message,
+      propertyId,
+      type,
+      appointmentDate,
+      appointmentTime,
+      requestedPlace, // ✅ NEW (optional)
+    } = req.body;
 
-    if (!propertyId || !mongoose.Types.ObjectId.isValid(propertyId)) {
-      return res.status(400).json({ message: 'Valid propertyId is required.' });
+    if (!propertyId) {
+      return res.status(400).json({ message: 'propertyId is required.' });
     }
 
     const inquiryType = type === 'appointment' ? 'appointment' : 'message';
 
-    if (!message || String(message).trim().length < 2) {
-      return res.status(400).json({ message: 'Message is required.' });
-    }
-
-    // load only what we need
-    const property = await Property.findById(propertyId).select('seller status');
-    if (!property) {
-      return res.status(404).json({ message: 'Property not found.' });
-    }
+    const property = await Property.findById(propertyId).populate('seller', 'name email');
+    if (!property) return res.status(404).json({ message: 'Property not found.' });
 
     if (property.status !== 'approved') {
       return res.status(403).json({ message: 'You can only inquire about approved properties.' });
     }
 
-    if (String(property.seller) === String(req.user._id)) {
+    if (String(property.seller?._id) === String(req.user._id)) {
       return res.status(400).json({ message: 'You cannot send an inquiry to your own property.' });
     }
 
-    // Appointment request: buyer may provide preferences, not final schedule
-    let appointmentPayload = undefined;
-    let status = 'new';
+    if (!message || String(message).trim().length < 2) {
+      return res.status(400).json({ message: 'Message is required.' });
+    }
+
+    // ✅ Appointment validation
+    if (inquiryType === 'appointment') {
+      if (!appointmentDate || !appointmentTime) {
+        return res.status(400).json({ message: 'Appointment date and time are required.' });
+      }
+    }
+
+    // ✅ Anti-spam but NOT a dead-end:
+    // - If latest inquiry exists and is still active => block
+    // - If latest inquiry was rejected => allow buyer to create a new one
+    const latest = await Inquiry.findOne({
+      buyer: req.user.id,
+      property: propertyId,
+    }).sort({ createdAt: -1 });
+
+    if (latest) {
+      const activeStatuses = ['pending', 'proposed', 'buyer_accepted'];
+      if (activeStatuses.includes(latest.status)) {
+        return res.status(400).json({
+          message: 'You already have an active inquiry/request for this property.',
+        });
+      }
+      // If seller_rejected or buyer_rejected => allow new request
+    }
+
+    const cleanMsg = String(message).trim();
+
+    const doc = {
+      buyer: req.user.id,
+      seller: property.seller._id,
+      property: propertyId,
+      message: cleanMsg,
+      email: req.user.email,
+      type: inquiryType,
+      status: 'pending',
+    };
 
     if (inquiryType === 'appointment') {
-      status = 'pending';
+      // Backward compatible fields
+      doc.appointmentDate = appointmentDate;
+      doc.appointmentTime = appointmentTime;
 
-      // Preferences are optional (seller will allocate final). Still validate if provided.
-      if ((requestedDate && !/^\d{4}-\d{2}-\d{2}$/.test(String(requestedDate))) ||
-          (requestedTime && !/^\d{2}:\d{2}$/.test(String(requestedTime)))) {
-        return res.status(400).json({ message: 'Invalid requestedDate/requestedTime format.' });
-      }
-
-      appointmentPayload = {
-        requestedDate: requestedDate ? String(requestedDate) : undefined,
-        requestedTime: requestedTime ? String(requestedTime) : undefined,
+      // New structured fields
+      doc.appointment = {
+        requestedDate: appointmentDate,
+        requestedTime: appointmentTime,
+        requestedPlace: requestedPlace ? String(requestedPlace).trim() : '',
       };
     }
 
-    // Anti-spam: one per buyer+property+type (enforced by unique index too)
-    const existingInquiry = await Inquiry.findOne({
-      buyer: req.user._id,
-      property: propertyId,
-      type: inquiryType,
-    });
-
-    if (existingInquiry) {
-      return res.status(400).json({
-        message: `You have already sent a ${inquiryType} request for this property.`,
-      });
-    }
-
-    const inquiry = await Inquiry.create({
-      buyer: req.user._id,
-      seller: property.seller,
-      property: propertyId,
-      type: inquiryType,
-      status,
-      message: String(message).trim(),
-      email: req.user.email,
-      appointment: appointmentPayload,
-    });
-
+    const inquiry = await Inquiry.create(doc);
     return res.status(201).json(inquiry);
   } catch (error) {
-    // handle unique index nicely
-    if (error && error.code === 11000) {
-      return res.status(400).json({
-        message: 'Duplicate inquiry: you already sent this type of request for this property.',
-      });
-    }
     console.error('INQUIRY ERROR:', error);
     return res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// @desc    Seller inbox (inquiries addressed to seller)
+// @desc    Get inquiries for the logged-in seller (Seller Inbox)
 // @route   GET /api/inquiries/my-inquiries
 // @access  Private (Seller only)
 const getMyInquiries = async (req, res) => {
@@ -103,110 +108,164 @@ const getMyInquiries = async (req, res) => {
       return res.status(403).json({ message: 'Only sellers can view inquiries.' });
     }
 
-    const inquiries = await Inquiry.find({ seller: req.user._id })
-      .populate('buyer', 'name email')
-      .populate('property', 'title')
+    const inquiries = await Inquiry.find({ seller: req.user.id })
+      .populate('buyer', 'name email role')
+      .populate('property', 'title images location price rooms')
       .sort({ createdAt: -1 });
 
     return res.json(inquiries);
   } catch (error) {
-    console.error('GET INQUIRIES ERROR:', error);
+    console.error(error);
     return res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// @desc    Seller responds to appointment (propose/confirm/reject)
-// @route   PUT /api/inquiries/:id/appointment-response
-// @access  Private (Seller only)
-const respondToAppointment = async (req, res) => {
+// @desc    Get inquiries sent by logged-in buyer
+// @route   GET /api/inquiries/my-sent
+// @access  Private (Buyer only)
+const getMySentInquiries = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== 'seller') {
-      return res.status(403).json({ message: 'Only sellers can respond to appointments.' });
+    if (!req.user || req.user.role !== 'buyer') {
+      return res.status(403).json({ message: 'Only buyers can view sent inquiries.' });
     }
 
-    const { id } = req.params;
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: 'Valid inquiry id is required.' });
-    }
+    const inquiries = await Inquiry.find({ buyer: req.user.id })
+      .populate('seller', 'name email role')
+      .populate('property', 'title images location price rooms')
+      .sort({ createdAt: -1 });
 
-    const { action, scheduledDate, scheduledTime, meetingPlace, sellerNote } = req.body;
+    return res.json(inquiries);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server Error' });
+  }
+};
 
-    // action: propose | confirm | reject
-    const normalizedAction = String(action || '').trim().toLowerCase();
-    if (!['propose', 'confirm', 'reject'].includes(normalizedAction)) {
-      return res.status(400).json({ message: 'action must be propose, confirm, or reject.' });
-    }
+// @desc    Seller responds to appointment: propose / accept_requested / reject
+// @route   PUT /api/inquiries/:id/seller-action
+// @access  Private (Seller only)
+const sellerActionOnAppointment = async (req, res) => {
+  try {
+    const { action, proposedDate, proposedTime, proposedPlace, sellerNote } = req.body;
 
-    const inquiry = await Inquiry.findById(id);
-    if (!inquiry) {
-      return res.status(404).json({ message: 'Inquiry not found.' });
-    }
+    const inquiry = await Inquiry.findById(req.params.id).populate(
+      'property',
+      'title location'
+    );
+
+    if (!inquiry) return res.status(404).json({ message: 'Inquiry not found.' });
 
     if (String(inquiry.seller) !== String(req.user._id)) {
-      return res.status(403).json({ message: 'Forbidden: not your inquiry.' });
+      return res.status(403).json({ message: 'Forbidden.' });
     }
 
     if (inquiry.type !== 'appointment') {
       return res.status(400).json({ message: 'This inquiry is not an appointment request.' });
     }
 
-    // If seller is proposing or confirming, require schedule + place
-    if (normalizedAction === 'propose' || normalizedAction === 'confirm') {
-      if (!scheduledDate || !scheduledTime || !meetingPlace) {
-        return res.status(400).json({
-          message: 'scheduledDate, scheduledTime, and meetingPlace are required.',
-        });
-      }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(scheduledDate))) {
-        return res.status(400).json({ message: 'scheduledDate must be YYYY-MM-DD.' });
-      }
-      if (!/^\d{2}:\d{2}$/.test(String(scheduledTime))) {
-        return res.status(400).json({ message: 'scheduledTime must be HH:mm.' });
-      }
-
-      inquiry.appointment = inquiry.appointment || {};
-      inquiry.appointment.scheduledDate = String(scheduledDate);
-      inquiry.appointment.scheduledTime = String(scheduledTime);
-      inquiry.appointment.meetingPlace = String(meetingPlace).trim();
-      inquiry.appointment.sellerNote = sellerNote ? String(sellerNote).trim() : undefined;
-      inquiry.appointment.respondedAt = new Date();
-
-      inquiry.status = normalizedAction === 'confirm' ? 'confirmed' : 'seller_proposed';
+    // Do not allow changes after hard terminal states
+    if (['buyer_accepted', 'buyer_rejected', 'seller_rejected'].includes(inquiry.status)) {
+      return res.status(400).json({ message: `Cannot act on status: ${inquiry.status}` });
     }
 
-    if (normalizedAction === 'reject') {
-      inquiry.appointment = inquiry.appointment || {};
-      inquiry.appointment.sellerNote = sellerNote ? String(sellerNote).trim() : 'Rejected by seller';
-      inquiry.appointment.respondedAt = new Date();
-      inquiry.status = 'rejected';
+    inquiry.appointment = inquiry.appointment || {};
+
+    // read requested (from new fields or fallback old fields)
+    const reqDate = inquiry.appointment.requestedDate || inquiry.appointmentDate || '';
+    const reqTime = inquiry.appointment.requestedTime || inquiry.appointmentTime || '';
+
+    const placeFallback =
+      inquiry.property?.location?.address
+        ? `${inquiry.property.location.address}${inquiry.property.location.city ? ', ' + inquiry.property.location.city : ''}`
+        : '';
+
+    if (action === 'reject') {
+      inquiry.status = 'seller_rejected';
+      inquiry.appointment.sellerNote = sellerNote ? String(sellerNote).trim() : 'Rejected.';
+      await inquiry.save();
+      return res.json({ message: 'Appointment rejected', inquiry });
     }
 
-    await inquiry.save();
+    if (action === 'accept_requested') {
+      // Accept buyer requested slot; seller may set place/note
+      inquiry.appointment.proposedDate = reqDate;
+      inquiry.appointment.proposedTime = reqTime;
+      inquiry.appointment.proposedPlace = proposedPlace
+        ? String(proposedPlace).trim()
+        : (placeFallback || '');
 
-    return res.json({ message: 'Appointment updated', inquiry });
-  } catch (error) {
-    console.error('RESPOND APPOINTMENT ERROR:', error);
+      inquiry.appointment.sellerNote = sellerNote ? String(sellerNote).trim() : '';
+
+      // Keep backward compatibility fields aligned (optional)
+      // (appointmentDate/time stay as buyer requested; proposed fields used for "final offer")
+      inquiry.status = 'proposed';
+      await inquiry.save();
+      return res.json({ message: 'Accepted requested slot (pending buyer confirmation)', inquiry });
+    }
+
+    if (action === 'propose') {
+      if (!proposedDate || !proposedTime) {
+        return res.status(400).json({ message: 'proposedDate and proposedTime are required.' });
+      }
+
+      inquiry.appointment.proposedDate = String(proposedDate).trim();
+      inquiry.appointment.proposedTime = String(proposedTime).trim();
+      inquiry.appointment.proposedPlace = proposedPlace
+        ? String(proposedPlace).trim()
+        : (placeFallback || '');
+
+      inquiry.appointment.sellerNote = sellerNote ? String(sellerNote).trim() : '';
+
+      inquiry.status = 'proposed';
+      await inquiry.save();
+      return res.json({ message: 'Proposed appointment (pending buyer confirmation)', inquiry });
+    }
+
+    return res.status(400).json({ message: 'Invalid action.' });
+  } catch (err) {
+    console.error(err);
     return res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// @desc    Buyer view their own sent inquiries (optional but useful for UI)
-// @route   GET /api/inquiries/my-requests
+// @desc    Buyer accepts/rejects seller proposal
+// @route   PUT /api/inquiries/:id/buyer-response
 // @access  Private (Buyer only)
-const getMyRequests = async (req, res) => {
+const buyerRespondToAppointment = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== 'buyer') {
-      return res.status(403).json({ message: 'Only buyers can view their requests.' });
+    const { action, buyerNote } = req.body; // action: 'accept' | 'reject'
+
+    const inquiry = await Inquiry.findById(req.params.id);
+
+    if (!inquiry) return res.status(404).json({ message: 'Inquiry not found.' });
+
+    if (String(inquiry.buyer) !== String(req.user._id)) {
+      return res.status(403).json({ message: 'Forbidden.' });
     }
 
-    const inquiries = await Inquiry.find({ buyer: req.user._id })
-      .populate('seller', 'name email')
-      .populate('property', 'title')
-      .sort({ createdAt: -1 });
+    if (inquiry.type !== 'appointment') {
+      return res.status(400).json({ message: 'Not an appointment inquiry.' });
+    }
 
-    return res.json(inquiries);
-  } catch (error) {
-    console.error('GET MY REQUESTS ERROR:', error);
+    if (inquiry.status !== 'proposed') {
+      return res.status(400).json({ message: `Cannot respond at status: ${inquiry.status}` });
+    }
+
+    inquiry.appointment = inquiry.appointment || {};
+    inquiry.appointment.buyerNote = buyerNote ? String(buyerNote).trim() : '';
+
+    if (action === 'accept') {
+      inquiry.status = 'buyer_accepted';
+    } else if (action === 'reject') {
+      inquiry.status = 'buyer_rejected';
+    } else {
+      return res.status(400).json({ message: 'Invalid action.' });
+    }
+
+    await inquiry.save();
+    return res.json({ message: 'Response saved', inquiry });
+  } catch (err) {
+    console.error(err);
     return res.status(500).json({ message: 'Server Error' });
   }
 };
@@ -214,6 +273,7 @@ const getMyRequests = async (req, res) => {
 module.exports = {
   createInquiry,
   getMyInquiries,
-  respondToAppointment,
-  getMyRequests,
+  getMySentInquiries,
+  sellerActionOnAppointment,
+  buyerRespondToAppointment,
 };

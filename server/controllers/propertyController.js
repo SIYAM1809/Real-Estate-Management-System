@@ -1,6 +1,8 @@
 // server/controllers/propertyController.js
 const Property = require('../models/Property');
+const User = require('../models/User');
 const cloudinary = require('cloudinary').v2;
+const { sendEmail } = require('../utils/email');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -171,7 +173,6 @@ const deleteProperty = async (req, res) => {
   }
 };
 
-
 // @desc    Get ALL properties (Admin)
 // @route   GET /api/properties/admin-all
 // @access  Private/Admin
@@ -211,6 +212,24 @@ const updateStatus = async (req, res) => {
     if (adminComment !== undefined) property.adminComment = String(adminComment);
 
     await property.save();
+
+    // Email seller when status changes
+    try {
+      const seller = await User.findById(property.seller).select('email name');
+      if (seller?.email) {
+        await sendEmail({
+          to: seller.email,
+          subject: `Your property was ${status}`,
+          text: `Hello ${seller.name}, your property "${property.title}" is now ${status}.`,
+          html: `<p>Hello <b>${seller.name}</b>,</p>
+                 <p>Your property "<b>${property.title}</b>" is now <b>${status}</b>.</p>`,
+        });
+      }
+    } catch (e) {
+      // Don't break main flow if email fails
+      console.error('Failed to send status email:', e.message);
+    }
+
     res.json(property);
   } catch (error) {
     console.error(error);

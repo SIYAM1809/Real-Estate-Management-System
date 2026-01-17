@@ -1,7 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { logout, reset as resetAuth } from '../features/auth/authSlice';
-import { reset as resetFavorites } from '../features/favorites/favoriteSlice';
+import { logout, reset } from '../features/auth/authSlice';
 import { FaSignOutAlt, FaUser, FaBuilding } from 'react-icons/fa';
 
 function Navbar() {
@@ -12,10 +11,19 @@ function Navbar() {
 
   const onLogout = () => {
     dispatch(logout());
-    dispatch(resetAuth());
-    dispatch(resetFavorites()); // ✅ clears buyer favorites from store
+    dispatch(reset());
     navigate('/');
   };
+
+  const dashboardLink =
+    user?.role === 'admin'
+      ? '/admin-dashboard'
+      : user?.role === 'seller'
+      ? '/seller-dashboard'
+      : '/dashboard';
+
+  const dashboardLabel =
+    user?.role === 'admin' ? 'Admin Panel' : user?.role === 'seller' ? 'Seller Panel' : 'Dashboard';
 
   return (
     <nav className="bg-white shadow-md">
@@ -36,13 +44,12 @@ function Navbar() {
               <li>
                 <span className="text-sm text-gray-400 mr-2">Hello, {user.name}</span>
                 <Link
-                  to={user.role === 'admin' ? '/admin-dashboard' : user.role === 'seller' ? '/seller-dashboard' : '/dashboard'}
+                  to={dashboardLink}
                   className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
                 >
-                  {user.role === 'admin' ? 'Admin Panel' : user.role === 'seller' ? 'Seller Panel' : 'Dashboard'}
+                  {dashboardLabel}
                 </Link>
               </li>
-
               <li>
                 <button
                   onClick={onLogout}

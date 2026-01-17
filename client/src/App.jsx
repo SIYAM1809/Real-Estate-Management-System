@@ -1,9 +1,8 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 // PAGES
-import Dashboard from './pages/Dashboard';
 import AddProperty from './pages/AddProperty';
 import Properties from './pages/Properties';
 import Home from './pages/Home';
@@ -12,6 +11,10 @@ import Register from './pages/Register';
 import PropertyDetails from './pages/PropertyDetails';
 import AdminDashboard from './pages/dashboard/AdminDashboard';
 import SellerDashboard from './pages/dashboard/SellerDashboard';
+import BuyerDashboard from './pages/dashboard/BuyerDashboard';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+
 
 // COMPONENTS
 import Navbar from './components/Navbar';
@@ -25,24 +28,29 @@ function App() {
           <Navbar />
 
           <Routes>
-            {/* Public */}
             <Route path="/" element={<Home />} />
-            <Route path="/properties" element={<Properties />} />
-            <Route path="/property/:id" element={<PropertyDetails />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
-            {/* Buyer only */}
+            {/* PUBLIC */}
+            <Route path="/properties" element={<Properties />} />
+            <Route path="/property/:id" element={<PropertyDetails />} />
+
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
+
+
+            {/* BUYER DASHBOARD (Protected) */}
             <Route
               path="/dashboard"
               element={
                 <PrivateRoute allowedRoles={['buyer']}>
-                  <Dashboard />
+                  <BuyerDashboard />
                 </PrivateRoute>
               }
             />
 
-            {/* Seller only */}
+            {/* SELLER (Protected) */}
             <Route
               path="/seller-dashboard"
               element={
@@ -60,7 +68,7 @@ function App() {
               }
             />
 
-            {/* Admin only */}
+            {/* ADMIN (Protected) */}
             <Route
               path="/admin-dashboard"
               element={
@@ -69,16 +77,9 @@ function App() {
                 </PrivateRoute>
               }
             />
-
-            {/* ✅ remove old /admin (was unprotected). If you want it, redirect safely */}
-            <Route path="/admin" element={<Navigate to="/admin-dashboard" replace />} />
-
-            {/* Fallback */}
-            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </Router>
-
       <ToastContainer />
     </>
   );
