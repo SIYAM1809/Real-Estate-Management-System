@@ -82,6 +82,12 @@ function PropertyDetails() {
       message,
       propertyId: property._id,
       type: inquiryType,
+
+      // ✅ new (preferred)
+      requestedDate: inquiryType === 'appointment' ? date : undefined,
+      requestedTime: inquiryType === 'appointment' ? time : undefined,
+
+      // ✅ old (compat)
       appointmentDate: inquiryType === 'appointment' ? date : undefined,
       appointmentTime: inquiryType === 'appointment' ? time : undefined,
     };
