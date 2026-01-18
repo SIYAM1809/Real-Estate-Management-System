@@ -25,7 +25,10 @@ router.get('/my-sent', protect, authorize('buyer'), getMySentInquiries);
 // ✅ Seller only: propose/accept_requested/reject appointment
 router.put('/:id/seller-action', protect, authorize('seller'), sellerActionOnAppointment);
 
-// ✅ Buyer only: accept/reject seller proposal
+// ✅ Buyer only: accept/reject seller proposal (CANONICAL)
 router.put('/:id/buyer-response', protect, authorize('buyer'), buyerRespondToAppointment);
+
+// ✅ BACKWARD-COMPAT ALIAS (so older frontend won't break)
+router.put('/:id/buyer-action', protect, authorize('buyer'), buyerRespondToAppointment);
 
 module.exports = router;

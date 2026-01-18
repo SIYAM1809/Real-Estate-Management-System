@@ -68,10 +68,9 @@ const getApprovedReviews = async (req, res) => {
   }
 };
 
-// Admin: pending reviews
+// Admin: pending reviews (kept for backward compatibility)
 const getPendingReviews = async (req, res) => {
   try {
-    // Route is already authorize('admin'), but keep it safe
     if (!req.user || req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Admin only.' });
     }
@@ -84,6 +83,40 @@ const getPendingReviews = async (req, res) => {
     return res.json(reviews);
   } catch (err) {
     console.error('GET PENDING REVIEWS ERROR:', err);
+    return res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// ✅ Admin: get reviews by status (this is what your frontend expects at /api/reviews/admin)
+const adminGetReviews = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin only.' });
+    }
+
+    const { status } = req.query;
+
+    // allow: pending/approved/rejected or empty (all)
+    const allowed = new Set(['pending', 'approved', 'rejected']);
+    const filter = {};
+
+    if (status) {
+      if (!allowed.has(status)) {
+        return res.status(400).json({
+          message: 'Invalid status filter. Use pending, approved, or rejected.',
+        });
+      }
+      filter.status = status;
+    }
+
+    const reviews = await Review.find(filter)
+      .populate('buyer', 'name email')
+      .populate('property', 'title')
+      .sort({ createdAt: -1 });
+
+    return res.json(reviews);
+  } catch (err) {
+    console.error('ADMIN GET REVIEWS ERROR:', err);
     return res.status(500).json({ message: 'Server Error' });
   }
 };
@@ -115,9 +148,32 @@ const updateReviewStatus = async (req, res) => {
   }
 };
 
+// ✅ Admin: delete review (your frontend calls DELETE /api/reviews/:id)
+const deleteReview = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin only.' });
+    }
+
+    const { id } = req.params;
+
+    const review = await Review.findById(id);
+    if (!review) return res.status(404).json({ message: 'Review not found' });
+
+    await review.deleteOne();
+
+    return res.json({ message: 'Review deleted' });
+  } catch (err) {
+    console.error('DELETE REVIEW ERROR:', err);
+    return res.status(500).json({ message: 'Server Error' });
+  }
+};
+
 module.exports = {
   createReview,
   getApprovedReviews,
   getPendingReviews,
+  adminGetReviews,     // ✅ NEW
   updateReviewStatus,
+  deleteReview,        // ✅ NEW
 };

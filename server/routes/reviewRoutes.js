@@ -6,7 +6,9 @@ const {
   createReview,
   getApprovedReviews,
   getPendingReviews,
+  adminGetReviews,
   updateReviewStatus,
+  deleteReview,
 } = require('../controllers/reviewController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -18,11 +20,16 @@ router.post('/', protect, authorize('buyer'), createReview);
 // Public: approved reviews for a property
 router.get('/property/:propertyId', getApprovedReviews);
 
-// Admin: pending reviews + status update
+// Admin: pending reviews (older route, keep it)
 router.get('/pending', protect, authorize('admin'), getPendingReviews);
+
+// ✅ Admin: all reviews filtered by status (frontend expects this)
+router.get('/admin', protect, authorize('admin'), adminGetReviews);
+
+// Admin: approve/reject
 router.put('/:id/status', protect, authorize('admin'), updateReviewStatus);
 
-router.get("/admin", protect, authorize("admin"), adminGetReviews);
-
+// ✅ Admin: delete review (frontend expects this)
+router.delete('/:id', protect, authorize('admin'), deleteReview);
 
 module.exports = router;

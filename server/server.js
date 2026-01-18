@@ -14,7 +14,10 @@ connectDB();
 const app = express();
 
 // Middleware
-app.use(cors());
+// ✅ Allow all origins (your issue earlier was frontend calling localhost from Vercel,
+// not a backend CORS restriction). This won't break local or deployed.
+app.use(cors({ origin: true, credentials: true }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -25,7 +28,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/properties', require('./routes/propertyRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 
-// ✅ NEW: reviews
+// ✅ reviews
 app.use('/api/reviews', require('./routes/reviewRoutes'));
 
 // Health route

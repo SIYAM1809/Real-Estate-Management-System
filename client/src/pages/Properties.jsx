@@ -23,16 +23,21 @@ function Properties() {
   useEffect(() => {
     fetchFilteredProperties();
 
-    // Only fetch favorites if logged in (buyer)
-    if (user) {
+    // ✅ Only fetch favorites if logged in AND buyer
+    if (user?.role === 'buyer') {
       dispatch(getFavorites());
     }
-  }, [dispatch, user]);
+  }, [dispatch, user]); // ok
 
   const fetchFilteredProperties = async () => {
     setLoading(true);
     try {
-      const queryStr = `${API_BASE}/api/properties?keyword=${encodeURIComponent(filters.keyword)}&city=${encodeURIComponent(filters.city)}&category=${encodeURIComponent(filters.category)}&maxPrice=${encodeURIComponent(filters.maxPrice)}`;
+      const queryStr = `${API_BASE}/api/properties?keyword=${encodeURIComponent(
+        filters.keyword
+      )}&city=${encodeURIComponent(filters.city)}&category=${encodeURIComponent(
+        filters.category
+      )}&maxPrice=${encodeURIComponent(filters.maxPrice)}`;
+
       const response = await axios.get(queryStr);
       setDisplayProperties(response.data || []);
     } catch (error) {
@@ -58,9 +63,14 @@ function Properties() {
     <div className="container mx-auto px-4 py-8">
       {/* SEARCH BAR */}
       <div className="bg-white p-6 rounded-xl shadow-md mb-10 border border-gray-100">
-        <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <form
+          onSubmit={handleSearch}
+          className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end"
+        >
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-1">Keyword</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1">
+              Keyword
+            </label>
             <div className="relative">
               <FaSearch className="absolute left-3 top-3 text-gray-400" />
               <input
@@ -75,7 +85,9 @@ function Properties() {
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">City</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1">
+              City
+            </label>
             <input
               type="text"
               name="city"
@@ -87,7 +99,9 @@ function Properties() {
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Type</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1">
+              Type
+            </label>
             <select
               name="category"
               value={filters.category}
@@ -102,14 +116,19 @@ function Properties() {
           </div>
 
           <div>
-            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-2 rounded-lg flex items-center justify-center gap-2">
+            <button
+              type="submit"
+              className="w-full bg-blue-600 text-white font-bold py-2 rounded-lg flex items-center justify-center gap-2"
+            >
               <FaFilter /> Search
             </button>
           </div>
         </form>
       </div>
 
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Available Properties</h1>
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">
+        Available Properties
+      </h1>
 
       {loading ? (
         <div className="text-center py-20 text-xl text-gray-500">Searching...</div>
