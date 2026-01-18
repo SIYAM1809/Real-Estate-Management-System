@@ -1,18 +1,15 @@
 // client/src/features/favorites/favoriteService.js
-import axios from 'axios';
+import axios from "axios";
+import { API_BASE } from "../../utils/apiBase";
 
-const API_URL = 'http://localhost:5000/api/users/favorites/';
+const API_URL = `${API_BASE}/api/users/favorites/`;
 
 // Get user favorites
 const getFavorites = async (token) => {
-  if (!token) {
-    throw new Error('No authentication token found. Please login again.');
-  }
+  if (!token) throw new Error("No authentication token found. Please login again.");
 
   const config = {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
   };
 
   const response = await axios.get(API_URL, config);
@@ -21,24 +18,17 @@ const getFavorites = async (token) => {
 
 // Toggle Favorite (Add/Remove)
 const toggleFavorite = async (propertyId, token) => {
-  if (!token) {
-    throw new Error('No authentication token found. Please login again.');
-  }
+  if (!token) throw new Error("No authentication token found. Please login again.");
 
   const config = {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
   };
 
-  // PUT (url, body, config)
   const response = await axios.put(`${API_URL}${propertyId}`, {}, config);
   return response.data;
 };
 
-const favoriteService = {
+export default {
   getFavorites,
   toggleFavorite,
 };
-
-export default favoriteService;

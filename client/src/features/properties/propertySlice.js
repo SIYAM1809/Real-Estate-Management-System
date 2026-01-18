@@ -1,79 +1,133 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import propertyService from './propertyService';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import propertyService from "./propertyService";
 
 const initialState = {
-  properties: [],      // Used for lists (All houses OR My houses)
-  property: {},        // Used for single house details
+  properties: [],
+  property: {},
   isError: false,
   isSuccess: false,
   isLoading: false,
-  message: '',
+  message: "",
 };
 
-// Get all properties (Public)
-export const getProperties = createAsyncThunk('properties/getAll', async (_, thunkAPI) => {
-  try {
-    return await propertyService.getProperties();
-  } catch (error) {
-    const message = (error.response && error.response.data && error.response.data.message) || error.message || error.toString();
-    return thunkAPI.rejectWithValue(message);
+// Public (optional): get approved properties via redux
+export const getProperties = createAsyncThunk(
+  "properties/getAll",
+  async (filters, thunkAPI) => {
+    try {
+      return await propertyService.getProperties(filters);
+    } catch (error) {
+      const message =
+        (error.response && error.response.data && error.response.data.message) ||
+        error.message ||
+        error.toString();
+      return thunkAPI.rejectWithValue(message);
+    }
   }
-});
+);
 
-// Get MY properties (Seller)
-export const getMyProperties = createAsyncThunk('properties/getMy', async (_, thunkAPI) => {
-  try {
-    const token = thunkAPI.getState().auth.user.token;
-    return await propertyService.getMyProperties(token);
-  } catch (error) {
-    const message = (error.response && error.response.data && error.response.data.message) || error.message || error.toString();
-    return thunkAPI.rejectWithValue(message);
+// Public: get single property
+export const getProperty = createAsyncThunk(
+  "properties/getOne",
+  async (id, thunkAPI) => {
+    try {
+      return await propertyService.getProperty(id);
+    } catch (error) {
+      const message =
+        (error.response && error.response.data && error.response.data.message) ||
+        error.message ||
+        error.toString();
+      return thunkAPI.rejectWithValue(message);
+    }
   }
-});
+);
 
-// Get Single Property
-export const getProperty = createAsyncThunk('properties/getOne', async (id, thunkAPI) => {
-  try {
-    return await propertyService.getProperty(id);
-  } catch (error) {
-    const message = (error.response && error.response.data && error.response.data.message) || error.message || error.toString();
-    return thunkAPI.rejectWithValue(message);
+// Seller: create property
+export const createProperty = createAsyncThunk(
+  "properties/create",
+  async (formData, thunkAPI) => {
+    try {
+      const token = thunkAPI.getState().auth.user.token;
+      return await propertyService.createProperty(formData, token);
+    } catch (error) {
+      const message =
+        (error.response && error.response.data && error.response.data.message) ||
+        error.message ||
+        error.toString();
+      return thunkAPI.rejectWithValue(message);
+    }
   }
-});
+);
 
-// Create Property
-export const createProperty = createAsyncThunk('properties/create', async (propertyData, thunkAPI) => {
-  try {
-    const token = thunkAPI.getState().auth.user.token;
-    return await propertyService.createProperty(propertyData, token);
-  } catch (error) {
-    const message = (error.response && error.response.data && error.response.data.message) || error.message || error.toString();
-    return thunkAPI.rejectWithValue(message);
+// Seller: update property
+export const updateProperty = createAsyncThunk(
+  "properties/update",
+  async ({ id, updates }, thunkAPI) => {
+    try {
+      const token = thunkAPI.getState().auth.user.token;
+      return await propertyService.updateProperty(id, updates, token);
+    } catch (error) {
+      const message =
+        (error.response && error.response.data && error.response.data.message) ||
+        error.message ||
+        error.toString();
+      return thunkAPI.rejectWithValue(message);
+    }
   }
-});
+);
 
-// Delete Property
-export const deleteProperty = createAsyncThunk('properties/delete', async (id, thunkAPI) => {
-  try {
-    const token = thunkAPI.getState().auth.user.token;
-    await propertyService.deleteProperty(id, token);
-    return id; // Return the ID so we can remove it from the UI immediately
-  } catch (error) {
-    const message = (error.response && error.response.data && error.response.data.message) || error.message || error.toString();
-    return thunkAPI.rejectWithValue(message);
+// Seller: delete property
+export const deleteProperty = createAsyncThunk(
+  "properties/delete",
+  async (id, thunkAPI) => {
+    try {
+      const token = thunkAPI.getState().auth.user.token;
+      await propertyService.deleteProperty(id, token);
+      return id;
+    } catch (error) {
+      const message =
+        (error.response && error.response.data && error.response.data.message) ||
+        error.message ||
+        error.toString();
+      return thunkAPI.rejectWithValue(message);
+    }
   }
-});
+);
 
-export const propertySlice = createSlice({
-  name: 'property',
+// Seller: my listings
+export const getMyProperties = createAsyncThunk(
+  "properties/myListings",
+  async (_, thunkAPI) => {
+    try {
+      const token = thunkAPI.getState().auth.user.token;
+      return await propertyService.getMyProperties(token);
+    } catch (error) {
+      const message =
+        (error.response && error.response.data && error.response.data.message) ||
+        error.message ||
+        error.toString();
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+const propertySlice = createSlice({
+  name: "properties",
   initialState,
   reducers: {
-    reset: (state) => initialState,
+    reset: (state) => {
+      state.isLoading = false;
+      state.isSuccess = false;
+      state.isError = false;
+      state.message = "";
+    },
   },
   extraReducers: (builder) => {
     builder
-      // Get All
-      .addCase(getProperties.pending, (state) => { state.isLoading = true; })
+      // getProperties
+      .addCase(getProperties.pending, (state) => {
+        state.isLoading = true;
+      })
       .addCase(getProperties.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
@@ -84,20 +138,11 @@ export const propertySlice = createSlice({
         state.isError = true;
         state.message = action.payload;
       })
-      // Get My Properties
-      .addCase(getMyProperties.pending, (state) => { state.isLoading = true; })
-      .addCase(getMyProperties.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.isSuccess = true;
-        state.properties = action.payload; // Update the list with MY houses
+
+      // getProperty
+      .addCase(getProperty.pending, (state) => {
+        state.isLoading = true;
       })
-      .addCase(getMyProperties.rejected, (state, action) => {
-        state.isLoading = false;
-        state.isError = true;
-        state.message = action.payload;
-      })
-      // Get Single
-      .addCase(getProperty.pending, (state) => { state.isLoading = true; })
       .addCase(getProperty.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
@@ -108,27 +153,58 @@ export const propertySlice = createSlice({
         state.isError = true;
         state.message = action.payload;
       })
-      // Create
-      .addCase(createProperty.pending, (state) => { state.isLoading = true; })
+
+      // createProperty
+      .addCase(createProperty.pending, (state) => {
+        state.isLoading = true;
+      })
       .addCase(createProperty.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
-        state.properties.push(action.payload);
+        state.properties.unshift(action.payload);
       })
       .addCase(createProperty.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
       })
-      // Delete
-      .addCase(deleteProperty.pending, (state) => { state.isLoading = true; })
-      .addCase(deleteProperty.fulfilled, (state, action) => {
+
+      // updateProperty
+      .addCase(updateProperty.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(updateProperty.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
-        // Remove the deleted item from the list instantly
-        state.properties = state.properties.filter((prop) => prop._id !== action.payload);
+        state.properties = state.properties.map((p) =>
+          p._id === action.payload._id ? action.payload : p
+        );
+      })
+      .addCase(updateProperty.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+
+      // deleteProperty
+      .addCase(deleteProperty.fulfilled, (state, action) => {
+        state.properties = state.properties.filter((p) => p._id !== action.payload);
       })
       .addCase(deleteProperty.rejected, (state, action) => {
+        state.isError = true;
+        state.message = action.payload;
+      })
+
+      // getMyProperties
+      .addCase(getMyProperties.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(getMyProperties.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isSuccess = true;
+        state.properties = action.payload;
+      })
+      .addCase(getMyProperties.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
