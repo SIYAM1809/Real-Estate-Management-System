@@ -3,19 +3,20 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 // PAGES
-import AddProperty from './pages/AddProperty';
-import Properties from './pages/Properties';
 import Home from './pages/Home';
+import Properties from './pages/Properties';
+import PropertyDetails from './pages/PropertyDetails';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import PropertyDetails from './pages/PropertyDetails';
-import AdminDashboard from './pages/dashboard/AdminDashboard';
-import SellerDashboard from './pages/dashboard/SellerDashboard';
-import BuyerDashboard from './pages/dashboard/BuyerDashboard';
+import AddProperty from './pages/AddProperty';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
-import AdminReviews from './pages/dashboard/AdminReviews';
 
+// DASHBOARDS
+import BuyerDashboard from './pages/dashboard/BuyerDashboard';
+import SellerDashboard from './pages/dashboard/SellerDashboard';
+import AdminDashboard from './pages/dashboard/AdminDashboard';
+import AdminReviews from './pages/dashboard/AdminReviews';
 
 // COMPONENTS
 import Navbar from './components/Navbar';
@@ -29,19 +30,18 @@ function App() {
           <Navbar />
 
           <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-
             {/* PUBLIC */}
+            <Route path="/" element={<Home />} />
             <Route path="/properties" element={<Properties />} />
             <Route path="/property/:id" element={<PropertyDetails />} />
 
+            {/* AUTH */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-
-            {/* BUYER DASHBOARD (Protected) */}
+            {/* BUYER */}
             <Route
               path="/dashboard"
               element={
@@ -51,7 +51,7 @@ function App() {
               }
             />
 
-            {/* SELLER (Protected) */}
+            {/* SELLER */}
             <Route
               path="/seller-dashboard"
               element={
@@ -69,43 +69,7 @@ function App() {
               }
             />
 
-            <Route
-  path="/dashboard"
-  element={
-    <PrivateRoute allowedRoles={['buyer']}>
-      <BuyerDashboard />
-    </PrivateRoute>
-  }
-/>
-
-<Route
-  path="/seller-dashboard"
-  element={
-    <PrivateRoute allowedRoles={['seller']}>
-      <SellerDashboard />
-    </PrivateRoute>
-  }
-/>
-
-<Route
-  path="/admin-dashboard"
-  element={
-    <PrivateRoute allowedRoles={['admin']}>
-      <AdminDashboard />
-    </PrivateRoute>
-  }
-/>
-
-<Route
-  path="/admin-reviews"
-  element={
-    <PrivateRoute allowedRoles={['admin']}>
-      <AdminReviews />
-    </PrivateRoute>
-  }
-/>
-
-            {/* ADMIN (Protected) */}
+            {/* ADMIN */}
             <Route
               path="/admin-dashboard"
               element={
@@ -114,9 +78,18 @@ function App() {
                 </PrivateRoute>
               }
             />
+            <Route
+              path="/admin-reviews"
+              element={
+                <PrivateRoute allowedRoles={['admin']}>
+                  <AdminReviews />
+                </PrivateRoute>
+              }
+            />
           </Routes>
         </div>
       </Router>
+
       <ToastContainer />
     </>
   );
