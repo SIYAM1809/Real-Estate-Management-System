@@ -1,53 +1,31 @@
-import axios from 'axios';
+import axios from "axios";
+import { API_BASE } from "../../utils/apiBase";
 
-const API_URL = 'http://localhost:5000/api/inquiries/';
+const API_URL = `${API_BASE}/api/inquiries/`;
 
-const authConfig = (token) => ({
-  headers: { Authorization: `Bearer ${token}` },
-});
-
-// Buyer: create new inquiry
+// Buyer sends inquiry
 const createInquiry = async (inquiryData, token) => {
-  const response = await axios.post(API_URL, inquiryData, authConfig(token));
+  const config = { headers: { Authorization: `Bearer ${token}` } };
+  const response = await axios.post(API_URL, inquiryData, config);
   return response.data;
 };
 
-// Seller: inbox
+// Seller inbox
 const getMyInquiries = async (token) => {
-  const response = await axios.get(API_URL + 'my-inquiries', authConfig(token));
+  const config = { headers: { Authorization: `Bearer ${token}` } };
+  const response = await axios.get(`${API_URL}my-inquiries`, config);
   return response.data;
 };
 
-// Buyer: sent inquiries
-const getMySentInquiries = async (token) => {
-  const response = await axios.get(API_URL + 'my-sent', authConfig(token));
-  return response.data;
-};
-
-// Seller: propose / accept_requested / reject
-const sellerAction = async (inquiryId, payload, token) => {
-  const response = await axios.put(
-    API_URL + `${inquiryId}/seller-action`,
-    payload,
-    authConfig(token)
-  );
-  return response.data;
-};
-
-// Buyer: accept / reject
-const buyerRespond = async (inquiryId, payload, token) => {
-  const response = await axios.put(
-    API_URL + `${inquiryId}/buyer-response`,
-    payload,
-    authConfig(token)
-  );
+// Buyer sent inquiries (ONLY if your backend route exists, see below)
+const getMySent = async (token) => {
+  const config = { headers: { Authorization: `Bearer ${token}` } };
+  const response = await axios.get(`${API_URL}my-sent`, config);
   return response.data;
 };
 
 export default {
   createInquiry,
   getMyInquiries,
-  getMySentInquiries,
-  sellerAction,
-  buyerRespond,
+  getMySent,
 };

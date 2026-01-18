@@ -22,4 +22,7 @@ router.get('/property/:propertyId', getApprovedReviews);
 router.get('/pending', protect, authorize('admin'), getPendingReviews);
 router.put('/:id/status', protect, authorize('admin'), updateReviewStatus);
 
+router.get("/admin", protect, authorize("admin"), adminGetReviews);
+
+
 module.exports = router;
