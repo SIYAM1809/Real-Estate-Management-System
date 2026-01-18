@@ -94,9 +94,18 @@ const reviewSlice = createSlice({
   initialState,
   reducers: {
     resetReviews: () => initialState,
+
+    // ✅ NEW: clear only flags/messages (keep lists)
+    clearReviewStatus: (state) => {
+      state.isLoading = false;
+      state.isSuccess = false;
+      state.isError = false;
+      state.message = '';
+    },
   },
   extraReducers: (builder) => {
     builder
+      // property reviews
       .addCase(getPropertyReviews.pending, (state) => {
         state.isLoading = true;
       })
@@ -109,8 +118,13 @@ const reviewSlice = createSlice({
         state.isError = true;
         state.message = action.payload;
       })
+
+      // ✅ create review (fix success/flag behavior)
       .addCase(createReview.pending, (state) => {
         state.isLoading = true;
+        state.isSuccess = false;
+        state.isError = false;
+        state.message = '';
       })
       .addCase(createReview.fulfilled, (state) => {
         state.isLoading = false;
@@ -121,9 +135,21 @@ const reviewSlice = createSlice({
         state.isError = true;
         state.message = action.payload;
       })
+
+      // admin reviews
+      .addCase(adminGetReviews.pending, (state) => {
+        state.isLoading = true;
+      })
       .addCase(adminGetReviews.fulfilled, (state, action) => {
+        state.isLoading = false;
         state.adminReviews = action.payload;
       })
+      .addCase(adminGetReviews.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+
       .addCase(adminUpdateReviewStatus.fulfilled, (state, action) => {
         state.adminReviews = state.adminReviews.map((r) =>
           r._id === action.payload._id ? action.payload : r
@@ -135,5 +161,5 @@ const reviewSlice = createSlice({
   },
 });
 
-export const { resetReviews } = reviewSlice.actions;
+export const { resetReviews, clearReviewStatus } = reviewSlice.actions;
 export default reviewSlice.reducer;

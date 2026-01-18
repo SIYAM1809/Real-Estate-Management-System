@@ -1,27 +1,28 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { toast } from 'react-toastify';
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { toast } from "react-toastify";
+import { API_BASE } from "../utils/apiBase";
 
 function ResetPassword() {
   const { token } = useParams();
   const navigate = useNavigate();
 
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (password !== confirm) return toast.error('Passwords do not match');
+    if (password !== confirm) return toast.error("Passwords do not match");
 
     try {
-      const res = await axios.put(`http://localhost:5000/api/users/reset-password/${token}`, {
+      const res = await axios.put(`${API_BASE}/api/users/reset-password/${token}`, {
         password,
       });
       toast.success(res.data.message);
-      navigate('/login');
+      navigate("/login");
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Invalid/expired token');
+      toast.error(err.response?.data?.message || "Invalid/expired token");
     }
   };
 

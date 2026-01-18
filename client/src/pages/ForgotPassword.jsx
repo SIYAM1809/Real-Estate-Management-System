@@ -1,18 +1,19 @@
-import { useState } from 'react';
-import axios from 'axios';
-import { toast } from 'react-toastify';
+import { useState } from "react";
+import axios from "axios";
+import { toast } from "react-toastify";
+import { API_BASE } from "../utils/apiBase";
 
 function ForgotPassword() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
 
   const onSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('http://localhost:5000/api/users/forgot-password', { email });
+      const res = await axios.post(`${API_BASE}/api/users/forgot-password`, { email });
       toast.success(res.data.message);
-      setEmail('');
+      setEmail("");
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Something went wrong');
+      toast.error(err.response?.data?.message || "Something went wrong");
     }
   };
 

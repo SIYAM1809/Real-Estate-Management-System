@@ -180,11 +180,17 @@ const sellerActionOnAppointment = async (req, res) => {
         : '';
 
     if (action === 'reject') {
-      inquiry.status = 'seller_rejected';
-      inquiry.appointment.sellerNote = sellerNote ? String(sellerNote).trim() : 'Rejected.';
-      await inquiry.save();
-      return res.json({ message: 'Appointment rejected', inquiry });
-    }
+    const reason = sellerNote ? String(sellerNote).trim() : '';
+    if (!reason) {
+    return res.status(400).json({ message: 'Rejection reason is required.' });
+  }
+
+    inquiry.status = 'seller_rejected';
+    inquiry.appointment.sellerNote = reason;
+    await inquiry.save();
+    return res.json({ message: 'Appointment rejected', inquiry });
+  }
+
 
     if (action === 'accept_requested') {
       // Accept buyer requested slot; seller may set place/note

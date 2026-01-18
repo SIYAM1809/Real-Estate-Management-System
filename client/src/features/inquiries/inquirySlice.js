@@ -67,7 +67,7 @@ export const sellerActionOnAppointment = createAsyncThunk(
   async ({ inquiryId, payload }, thunkAPI) => {
     try {
       const token = thunkAPI.getState().auth.user.token;
-      return await inquiryService.sellerAction(inquiryId, payload, token);
+      return await inquiryService.sellerActionOnAppointment(inquiryId, payload, token);
     } catch (error) {
       const message =
         (error.response && error.response.data && error.response.data.message) ||
@@ -84,9 +84,7 @@ export const buyerRespondToAppointment = createAsyncThunk(
   async ({ inquiryId, payload }, thunkAPI) => {
     try {
       const token = thunkAPI.getState().auth.user.token;
-
-      // ✅ FIX: your service exports buyerAction, not buyerRespond
-      return await inquiryService.buyerAction(inquiryId, payload, token);
+      return await inquiryService.buyerRespondToAppointment(inquiryId, payload, token);
     } catch (error) {
       const message =
         (error.response && error.response.data && error.response.data.message) ||

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { getFavorites } from '../../features/favorites/favoriteSlice';
 import {
@@ -7,6 +7,7 @@ import {
 } from '../../features/inquiries/inquirySlice';
 import PropertyItem from '../../components/properties/PropertyItem';
 import { toast } from 'react-toastify';
+import { FaSyncAlt } from 'react-icons/fa';
 
 function BuyerDashboard() {
   const dispatch = useDispatch();
@@ -17,10 +18,21 @@ function BuyerDashboard() {
 
   const isBuyer = user?.role === 'buyer';
 
-  useEffect(() => {
+  const refreshAll = useCallback(() => {
     if (!isBuyer) return;
     dispatch(getFavorites());
     dispatch(getMySentInquiries());
+  }, [dispatch, isBuyer]);
+
+  useEffect(() => {
+    refreshAll();
+  }, [refreshAll]);
+
+  // ✅ polling appointments (real-time-ish)
+  useEffect(() => {
+    if (!isBuyer) return;
+    const t = setInterval(() => dispatch(getMySentInquiries()), 15000);
+    return () => clearInterval(t);
   }, [dispatch, isBuyer]);
 
   const respond = async (inqId, action) => {
@@ -33,6 +45,8 @@ function BuyerDashboard() {
 
     if (res.meta.requestStatus === 'fulfilled') {
       toast.success(res.payload?.message || 'Updated');
+    } else {
+      toast.error(res.payload || 'Failed');
     }
   };
 
@@ -49,7 +63,7 @@ function BuyerDashboard() {
 
     return (
       <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${cls}`}>
-        {s.replace('_', ' ')}
+        {s.replaceAll('_', ' ')}
       </span>
     );
   };
@@ -58,9 +72,18 @@ function BuyerDashboard() {
 
   return (
     <div className="container mx-auto p-6 min-h-screen bg-gray-50">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Buyer Dashboard</h1>
-        <p className="text-gray-500">Welcome back, {user?.name}</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">Buyer Dashboard</h1>
+          <p className="text-gray-500">Welcome back, {user?.name}</p>
+        </div>
+
+        <button
+          onClick={refreshAll}
+          className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded hover:bg-black"
+        >
+          <FaSyncAlt /> Refresh
+        </button>
       </div>
 
       {/* FAVORITES */}
@@ -132,6 +155,12 @@ function BuyerDashboard() {
                     ) : null}
                   </div>
 
+                  {inq.status === 'pending' && (
+                    <div className="mt-3 text-sm text-gray-600 font-semibold">
+                      Waiting for seller response…
+                    </div>
+                  )}
+
                   {inq.status === 'proposed' && (
                     <div className="mt-3 bg-white border rounded p-3">
                       <div className="font-bold text-gray-800 mb-1">Seller Proposal</div>
@@ -145,7 +174,7 @@ function BuyerDashboard() {
                         </div>
                         {sellerNote ? (
                           <div className="mt-2">
-                            <span className="font-semibold">Note:</span> {sellerNote}
+                            <span className="font-semibold">Message from seller:</span> {sellerNote}
                           </div>
                         ) : null}
                       </div>
@@ -169,13 +198,29 @@ function BuyerDashboard() {
 
                   {inq.status === 'buyer_accepted' && (
                     <div className="mt-3 text-green-700 font-bold">
-                      ✅ Confirmed. See you at {propPlace || 'the agreed place'}.
+                      ✅ Confirmed.
+                      <div className="text-sm font-semibold text-green-800 mt-1">
+                        Date: {propDate || reqDate || '—'} | Time: {propTime || reqTime || '—'}
+                      </div>
+                      <div className="text-sm font-semibold text-green-800">
+                        Place: {propPlace || '—'}
+                      </div>
+                      {sellerNote ? (
+                        <div className="text-sm font-semibold text-green-800 mt-1">
+                          Seller message: {sellerNote}
+                        </div>
+                      ) : null}
                     </div>
                   )}
 
                   {inq.status === 'seller_rejected' && (
                     <div className="mt-3 text-red-700 font-bold">
-                      ❌ Seller rejected this request.
+                      ❌ Seller rejected your request.
+                      {sellerNote ? (
+                        <div className="text-sm font-semibold text-red-800 mt-1">
+                          Reason: {sellerNote}
+                        </div>
+                      ) : null}
                     </div>
                   )}
 

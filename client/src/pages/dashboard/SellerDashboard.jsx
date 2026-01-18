@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { getMyProperties, deleteProperty, reset as resetProps } from '../../features/properties/propertySlice';
@@ -18,6 +18,7 @@ import {
   FaCheck,
   FaTimes,
   FaEdit,
+  FaSyncAlt,
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
@@ -29,6 +30,8 @@ function SellerDashboard() {
   // seller action UI
   const [editingId, setEditingId] = useState(null);
   const [mode, setMode] = useState(null); // 'propose' | 'accept_requested' | 'reject'
+  const [busyInquiryId, setBusyInquiryId] = useState(null);
+
   const [form, setForm] = useState({
     proposedDate: '',
     proposedTime: '',
@@ -40,6 +43,11 @@ function SellerDashboard() {
   const { properties = [] } = useSelector((state) => state.properties) || {};
   const { inquiries = [], isError, message } = useSelector((state) => state.inquiries) || {};
 
+  const refreshAll = useCallback(() => {
+    dispatch(getMyProperties());
+    dispatch(getMyInquiries());
+  }, [dispatch]);
+
   useEffect(() => {
     if (!user) {
       navigate('/login');
@@ -50,14 +58,22 @@ function SellerDashboard() {
       return;
     }
 
-    dispatch(getMyProperties());
-    dispatch(getMyInquiries());
+    refreshAll();
 
     return () => {
       dispatch(resetProps());
       dispatch(resetInq());
     };
-  }, [user, navigate, dispatch]);
+  }, [user, navigate, dispatch, refreshAll]);
+
+  // ✅ polling only on Inbox tab (real-time-ish without crashing SPA)
+  useEffect(() => {
+    if (activeTab !== 'inbox') return;
+    const t = setInterval(() => {
+      dispatch(getMyInquiries());
+    }, 15000);
+    return () => clearInterval(t);
+  }, [activeTab, dispatch]);
 
   useEffect(() => {
     if (isError && message) toast.error(message);
@@ -71,7 +87,6 @@ function SellerDashboard() {
     setEditingId(inq._id);
     setMode(nextMode);
 
-    // prefill from requested (backward compatible)
     const reqDate = inq?.appointment?.requestedDate || inq?.appointmentDate || '';
     const reqTime = inq?.appointment?.requestedTime || inq?.appointmentTime || '';
     const reqPlace = inq?.appointment?.requestedPlace || '';
@@ -91,6 +106,16 @@ function SellerDashboard() {
   };
 
   const submitSellerAction = async (inq) => {
+    if (!mode) return;
+
+    // ✅ Strict rules based on your requirements:
+    // - reject MUST have reason
+    // - accept/propose can include note
+    if (mode === 'reject' && !String(form.sellerNote || '').trim()) {
+      toast.error('Rejection reason is required.');
+      return;
+    }
+
     const payload = { action: mode };
 
     if (mode === 'propose') {
@@ -105,22 +130,23 @@ function SellerDashboard() {
     }
 
     if (mode === 'accept_requested') {
-      // accept requested date/time; optionally set place/note
       payload.proposedPlace = form.proposedPlace;
       payload.sellerNote = form.sellerNote;
     }
 
     if (mode === 'reject') {
-      payload.sellerNote = form.sellerNote || 'Rejected.';
+      payload.sellerNote = String(form.sellerNote).trim();
     }
 
-    const res = await dispatch(
-      sellerActionOnAppointment({ inquiryId: inq._id, payload })
-    );
+    setBusyInquiryId(inq._id);
+    const res = await dispatch(sellerActionOnAppointment({ inquiryId: inq._id, payload }));
+    setBusyInquiryId(null);
 
     if (res.meta.requestStatus === 'fulfilled') {
       toast.success(res.payload?.message || 'Updated');
       closeEditor();
+    } else {
+      toast.error(res.payload || 'Action failed');
     }
   };
 
@@ -137,7 +163,7 @@ function SellerDashboard() {
 
     return (
       <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${cls}`}>
-        {s.replace('_', ' ')}
+        {s.replaceAll('_', ' ')}
       </span>
     );
   };
@@ -152,12 +178,22 @@ function SellerDashboard() {
           <h1 className="text-3xl font-bold text-gray-800">Seller Dashboard</h1>
           <p className="text-gray-500">Welcome, {user.name}</p>
         </div>
-        <button
-          onClick={() => navigate('/add-property')}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition shadow"
-        >
-          <FaPlus /> Add Property
-        </button>
+
+        <div className="flex gap-2">
+          <button
+            onClick={refreshAll}
+            className="bg-gray-800 hover:bg-black text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow"
+          >
+            <FaSyncAlt /> Refresh
+          </button>
+
+          <button
+            onClick={() => navigate('/add-property')}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition shadow"
+          >
+            <FaPlus /> Add Property
+          </button>
+        </div>
       </div>
 
       {/* TABS */}
@@ -193,7 +229,7 @@ function SellerDashboard() {
       {/* INBOX */}
       {activeTab === 'inbox' && (
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Your Messages</h2>
+          <h2 className="text-xl font-bold text-gray-800 mb-4">Your Requests</h2>
 
           {inquiries && inquiries.length > 0 ? (
             inquiries.map((msg) => {
@@ -209,15 +245,15 @@ function SellerDashboard() {
               const sellerNote = msg?.appointment?.sellerNote || '';
               const buyerNote = msg?.appointment?.buyerNote || '';
 
-              const canAct =
-                isAppointment && !['buyer_accepted', 'buyer_rejected', 'seller_rejected'].includes(msg.status);
+              // ✅ Seller can act ONLY when status is pending
+              const canAct = isAppointment && msg.status === 'pending';
+              const isBusy = busyInquiryId === msg._id;
 
               return (
                 <div
                   key={msg._id}
                   className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition"
                 >
-                  {/* Header */}
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <span className="font-bold text-lg text-gray-800">
@@ -231,7 +267,6 @@ function SellerDashboard() {
                     </span>
                   </div>
 
-                  {/* Appointment block */}
                   {isAppointment && (
                     <div className="space-y-3 mb-3">
                       <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg flex items-center gap-4">
@@ -254,7 +289,7 @@ function SellerDashboard() {
 
                       {msg.status === 'proposed' && (
                         <div className="bg-gray-50 border border-gray-200 p-3 rounded-lg text-sm">
-                          <div className="font-bold text-gray-800 mb-1">Your Proposal</div>
+                          <div className="font-bold text-gray-800 mb-1">Your Proposal (Waiting for buyer)</div>
                           <div>
                             <span className="font-semibold">Date:</span> {propDate || '—'} |{' '}
                             <span className="font-semibold">Time:</span> {propTime || '—'}
@@ -264,56 +299,84 @@ function SellerDashboard() {
                           </div>
                           {sellerNote ? (
                             <div className="mt-2">
-                              <span className="font-semibold">Note:</span> {sellerNote}
+                              <span className="font-semibold">Note sent to buyer:</span> {sellerNote}
                             </div>
                           ) : null}
                         </div>
                       )}
 
-                      {buyerNote ? (
-                        <div className="text-sm text-gray-700">
-                          <span className="font-bold">Buyer note:</span> {buyerNote}
+                      {msg.status === 'buyer_accepted' && (
+                        <div className="bg-green-50 border border-green-200 p-3 rounded-lg text-sm text-green-800">
+                          <div className="font-bold mb-1">✅ Buyer confirmed</div>
+                          <div>
+                            <span className="font-semibold">Date:</span> {propDate || reqDate || '—'} |{' '}
+                            <span className="font-semibold">Time:</span> {propTime || reqTime || '—'}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Place:</span> {propPlace || '—'}
+                          </div>
+                          {buyerNote ? (
+                            <div className="mt-2">
+                              <span className="font-semibold">Buyer note:</span> {buyerNote}
+                            </div>
+                          ) : null}
                         </div>
-                      ) : null}
+                      )}
+
+                      {msg.status === 'buyer_rejected' && (
+                        <div className="bg-red-50 border border-red-200 p-3 rounded-lg text-sm text-red-800">
+                          <div className="font-bold mb-1">❌ Buyer rejected your proposal</div>
+                          {buyerNote ? (
+                            <div>
+                              <span className="font-semibold">Buyer note:</span> {buyerNote}
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+
+                      {msg.status === 'seller_rejected' && (
+                        <div className="bg-red-50 border border-red-200 p-3 rounded-lg text-sm text-red-800">
+                          <div className="font-bold mb-1">❌ You rejected this request</div>
+                          <div>
+                            <span className="font-semibold">Reason sent to buyer:</span> {sellerNote || '—'}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* Message Body */}
                   <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 text-gray-700 italic mb-3">
                     "{msg.message}"
                   </div>
 
-                  {/* Seller actions */}
+                  {/* ✅ Seller actions ONLY on pending */}
                   {isAppointment && canAct && (
                     <div className="mt-3">
                       {editingId !== msg._id ? (
                         <div className="flex flex-wrap gap-2">
                           <button
                             onClick={() => openEditor(msg, 'accept_requested')}
-                            className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 flex items-center gap-2"
+                            className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 flex items-center gap-2 disabled:opacity-60"
+                            disabled={isBusy}
                           >
                             <FaCheck /> Accept Requested
                           </button>
 
                           <button
                             onClick={() => openEditor(msg, 'propose')}
-                            className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 flex items-center gap-2"
+                            className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 flex items-center gap-2 disabled:opacity-60"
+                            disabled={isBusy}
                           >
                             <FaEdit /> Propose New
                           </button>
 
                           <button
                             onClick={() => openEditor(msg, 'reject')}
-                            className="bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 flex items-center gap-2"
+                            className="bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 flex items-center gap-2 disabled:opacity-60"
+                            disabled={isBusy}
                           >
                             <FaTimes /> Reject
                           </button>
-
-                          {msg.status === 'proposed' && (
-                            <span className="text-xs text-gray-500 self-center ml-2">
-                              (Waiting for buyer response)
-                            </span>
-                          )}
                         </div>
                       ) : (
                         <div className="bg-white border border-gray-200 rounded-lg p-4 mt-3 space-y-3">
@@ -357,9 +420,7 @@ function SellerDashboard() {
 
                           {(mode === 'propose' || mode === 'accept_requested') && (
                             <div>
-                              <label className="text-xs font-bold text-gray-500">
-                                Meeting place (recommended)
-                              </label>
+                              <label className="text-xs font-bold text-gray-500">Meeting place</label>
                               <input
                                 type="text"
                                 className="w-full p-2 border rounded"
@@ -377,7 +438,7 @@ function SellerDashboard() {
 
                           <div>
                             <label className="text-xs font-bold text-gray-500">
-                              Note {mode === 'reject' ? '(reason)' : '(optional)'}
+                              Note {mode === 'reject' ? '(reason required)' : '(optional)'}
                             </label>
                             <textarea
                               className="w-full p-2 border rounded"
@@ -389,16 +450,22 @@ function SellerDashboard() {
 
                           <button
                             onClick={() => submitSellerAction(msg)}
-                            className="w-full bg-gray-900 text-white py-2 rounded hover:bg-black"
+                            className="w-full bg-gray-900 text-white py-2 rounded hover:bg-black disabled:opacity-60"
+                            disabled={isBusy}
                           >
-                            Submit
+                            {isBusy ? 'Submitting...' : 'Submit'}
                           </button>
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Footer */}
+                  {isAppointment && msg.status === 'proposed' && (
+                    <div className="text-xs text-gray-500 mt-3">
+                      Waiting for buyer response…
+                    </div>
+                  )}
+
                   <p className="text-sm font-bold text-gray-500 flex items-center gap-1 mt-3">
                     Property: <span className="text-blue-600">{msg.property?.title}</span>
                   </p>
@@ -407,7 +474,7 @@ function SellerDashboard() {
             })
           ) : (
             <div className="text-center py-10 text-gray-500 bg-white rounded-xl border border-dashed border-gray-300">
-              No messages found.
+              No requests found.
             </div>
           )}
         </div>
