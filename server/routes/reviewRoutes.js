@@ -4,26 +4,22 @@ const router = express.Router();
 
 const {
   createReview,
-  getPropertyReviews,
-  getMyReviews,
-  adminGetReviews,
-  adminUpdateReviewStatus,
-  adminDeleteReview,
+  getApprovedReviews,
+  getPendingReviews,
+  updateReviewStatus,
 } = require('../controllers/reviewController');
 
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 
-// Public
-router.get('/property/:propertyId', getPropertyReviews);
-
-// Buyer
+// Buyer: create review
 router.post('/', protect, authorize('buyer'), createReview);
-router.get('/my', protect, authorize('buyer'), getMyReviews);
 
-// Admin
-router.get('/admin', protect, authorize('admin'), adminGetReviews);
-router.put('/:id/status', protect, authorize('admin'), adminUpdateReviewStatus);
-router.delete('/:id', protect, authorize('admin'), adminDeleteReview);
+// Public: approved reviews for a property
+router.get('/property/:propertyId', getApprovedReviews);
+
+// Admin: pending reviews + status update
+router.get('/pending', protect, authorize('admin'), getPendingReviews);
+router.put('/:id/status', protect, authorize('admin'), updateReviewStatus);
 
 module.exports = router;

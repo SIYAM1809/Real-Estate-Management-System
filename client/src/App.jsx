@@ -14,6 +14,7 @@ import SellerDashboard from './pages/dashboard/SellerDashboard';
 import BuyerDashboard from './pages/dashboard/BuyerDashboard';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import AdminReviews from './pages/dashboard/AdminReviews';
 
 
 // COMPONENTS
@@ -67,6 +68,42 @@ function App() {
                 </PrivateRoute>
               }
             />
+
+            <Route
+  path="/dashboard"
+  element={
+    <PrivateRoute allowedRoles={['buyer']}>
+      <BuyerDashboard />
+    </PrivateRoute>
+  }
+/>
+
+<Route
+  path="/seller-dashboard"
+  element={
+    <PrivateRoute allowedRoles={['seller']}>
+      <SellerDashboard />
+    </PrivateRoute>
+  }
+/>
+
+<Route
+  path="/admin-dashboard"
+  element={
+    <PrivateRoute allowedRoles={['admin']}>
+      <AdminDashboard />
+    </PrivateRoute>
+  }
+/>
+
+<Route
+  path="/admin-reviews"
+  element={
+    <PrivateRoute allowedRoles={['admin']}>
+      <AdminReviews />
+    </PrivateRoute>
+  }
+/>
 
             {/* ADMIN (Protected) */}
             <Route
