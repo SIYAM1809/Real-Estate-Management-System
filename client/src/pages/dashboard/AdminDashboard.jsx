@@ -1,14 +1,12 @@
-// client/src/pages/dashboard/AdminDashboard.jsx
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { FaCheck, FaTimes, FaUserTie, FaStar } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaUserTie } from 'react-icons/fa';
+import { API_BASE } from '../../utils/apiBase';
 
 function AdminDashboard() {
   const [adminProperties, setAdminProperties] = useState([]);
-  const [pendingReviews, setPendingReviews] = useState([]);
-
   const { user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
 
@@ -19,15 +17,14 @@ function AdminDashboard() {
     }
 
     const fetchAdminData = async () => {
-      const config = { headers: { Authorization: `Bearer ${user.token}` } };
-
-      // existing: admin properties
-      const propRes = await axios.get('http://localhost:5000/api/properties/admin-all', config);
-      setAdminProperties(propRes.data);
-
-      // ✅ new: pending reviews
-      const reviewRes = await axios.get('http://localhost:5000/api/reviews/pending', config);
-      setPendingReviews(reviewRes.data);
+      try {
+        const config = { headers: { Authorization: `Bearer ${user.token}` } };
+        const res = await axios.get(`${API_BASE}/api/properties/admin-all`, config);
+        setAdminProperties(res.data || []);
+      } catch (err) {
+        console.error('Admin fetch error:', err?.message || err);
+        setAdminProperties([]);
+      }
     };
 
     fetchAdminData();
@@ -36,24 +33,11 @@ function AdminDashboard() {
   const handleStatusChange = async (id, newStatus) => {
     try {
       const config = { headers: { Authorization: `Bearer ${user.token}` } };
-      await axios.put(`http://localhost:5000/api/properties/${id}/status`, { status: newStatus }, config);
+      await axios.put(`${API_BASE}/api/properties/${id}/status`, { status: newStatus }, config);
 
       setAdminProperties((prev) =>
         prev.map((prop) => (prop._id === id ? { ...prop, status: newStatus } : prop))
       );
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  // ✅ new: approve/reject review
-  const handleReviewStatus = async (reviewId, status) => {
-    try {
-      const config = { headers: { Authorization: `Bearer ${user.token}` } };
-      await axios.put(`http://localhost:5000/api/reviews/${reviewId}/status`, { status }, config);
-
-      // remove from pending list after decision
-      setPendingReviews((prev) => prev.filter((r) => r._id !== reviewId));
     } catch (error) {
       console.error(error);
     }
@@ -65,13 +49,7 @@ function AdminDashboard() {
         <FaUserTie /> Admin Control Panel
       </h1>
 
-      {/* ------------------ PROPERTIES TABLE (existing) ------------------ */}
-      <div className="bg-white rounded-lg shadow overflow-hidden mb-10">
-        <div className="px-6 py-4 border-b">
-          <h2 className="text-xl font-bold text-gray-800">Property Approvals</h2>
-          <p className="text-sm text-gray-500">Approve or reject seller listings</p>
-        </div>
-
+      <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-800 text-white uppercase text-sm">
@@ -89,15 +67,14 @@ function AdminDashboard() {
                 <td className="py-3 px-6">
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-bold 
-                    ${
-                      property.status === 'approved'
-                        ? 'bg-green-200 text-green-800'
-                        : property.status === 'rejected'
-                        ? 'bg-red-200 text-red-800'
-                        : 'bg-yellow-200 text-yellow-800'
+                    ${property.status === 'approved'
+                      ? 'bg-green-200 text-green-800'
+                      : property.status === 'rejected'
+                      ? 'bg-red-200 text-red-800'
+                      : 'bg-yellow-200 text-yellow-800'
                     }`}
                   >
-                    {property.status.toUpperCase()}
+                    {String(property.status || '').toUpperCase()}
                   </span>
                 </td>
                 <td className="py-3 px-6 text-center flex justify-center gap-2">
@@ -118,60 +95,16 @@ function AdminDashboard() {
                 </td>
               </tr>
             ))}
+
+            {adminProperties.length === 0 && (
+              <tr>
+                <td colSpan="4" className="py-10 text-center text-gray-500">
+                  No properties found.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
-      </div>
-
-      {/* ------------------ ✅ PENDING REVIEWS (new) ------------------ */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <FaStar className="text-yellow-500" /> Pending Reviews
-          </h2>
-          <p className="text-sm text-gray-500">Approve or reject buyer reviews</p>
-        </div>
-
-        {pendingReviews.length === 0 ? (
-          <div className="p-6 text-gray-500">No pending reviews.</div>
-        ) : (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-800 text-white uppercase text-sm">
-                <th className="py-3 px-6">Property</th>
-                <th className="py-3 px-6">Buyer</th>
-                <th className="py-3 px-6">Rating</th>
-                <th className="py-3 px-6">Comment</th>
-                <th className="py-3 px-6 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="text-gray-700 text-sm">
-              {pendingReviews.map((r) => (
-                <tr key={r._id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-6 font-bold">{r.property?.title || 'Unknown'}</td>
-                  <td className="py-3 px-6">{r.buyer?.name || 'Unknown'}</td>
-                  <td className="py-3 px-6">{r.rating} / 5</td>
-                  <td className="py-3 px-6">{r.comment || '-'}</td>
-                  <td className="py-3 px-6 text-center flex justify-center gap-2">
-                    <button
-                      onClick={() => handleReviewStatus(r._id, 'approved')}
-                      className="bg-green-500 text-white p-2 rounded hover:bg-green-600"
-                      title="Approve Review"
-                    >
-                      <FaCheck />
-                    </button>
-                    <button
-                      onClick={() => handleReviewStatus(r._id, 'rejected')}
-                      className="bg-red-500 text-white p-2 rounded hover:bg-red-600"
-                      title="Reject Review"
-                    >
-                      <FaTimes />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </div>
     </div>
   );

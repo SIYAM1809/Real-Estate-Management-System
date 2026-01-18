@@ -4,6 +4,7 @@ import { getFavorites } from '../features/favorites/favoriteSlice';
 import PropertyItem from '../components/properties/PropertyItem';
 import { FaSearch, FaFilter } from 'react-icons/fa';
 import axios from 'axios';
+import { API_BASE } from '../utils/apiBase';
 
 function Properties() {
   const dispatch = useDispatch();
@@ -17,14 +18,13 @@ function Properties() {
 
   const [displayProperties, setDisplayProperties] = useState([]);
   const [loading, setLoading] = useState(false);
-
   const { user } = useSelector((state) => state.auth);
 
   useEffect(() => {
     fetchFilteredProperties();
 
-    // ✅ Favorites should be loaded ONLY for buyer accounts
-    if (user?.role === 'buyer') {
+    // Only fetch favorites if logged in (buyer)
+    if (user) {
       dispatch(getFavorites());
     }
   }, [dispatch, user]);
@@ -32,14 +32,14 @@ function Properties() {
   const fetchFilteredProperties = async () => {
     setLoading(true);
     try {
-      const queryStr = `http://localhost:5000/api/properties?keyword=${filters.keyword}&city=${filters.city}&category=${filters.category}&maxPrice=${filters.maxPrice}`;
+      const queryStr = `${API_BASE}/api/properties?keyword=${encodeURIComponent(filters.keyword)}&city=${encodeURIComponent(filters.city)}&category=${encodeURIComponent(filters.category)}&maxPrice=${encodeURIComponent(filters.maxPrice)}`;
       const response = await axios.get(queryStr);
-      setDisplayProperties(response.data);
+      setDisplayProperties(response.data || []);
     } catch (error) {
-      console.error('Search Error:', error);
-    } finally {
-      setLoading(false);
+      console.error('Search Error:', error?.message || error);
+      setDisplayProperties([]);
     }
+    setLoading(false);
   };
 
   const handleSearch = (e) => {
@@ -56,6 +56,7 @@ function Properties() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* SEARCH BAR */}
       <div className="bg-white p-6 rounded-xl shadow-md mb-10 border border-gray-100">
         <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <div className="md:col-span-2">
@@ -101,10 +102,7 @@ function Properties() {
           </div>
 
           <div>
-            <button
-              type="submit"
-              className="w-full bg-blue-600 text-white font-bold py-2 rounded-lg flex items-center justify-center gap-2"
-            >
+            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-2 rounded-lg flex items-center justify-center gap-2">
               <FaFilter /> Search
             </button>
           </div>
