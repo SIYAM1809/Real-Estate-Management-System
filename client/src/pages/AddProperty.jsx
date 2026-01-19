@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { createProperty, reset } from '../features/properties/propertySlice';
 import { toast } from 'react-toastify';
 import { FaArrowLeft, FaCloudUploadAlt, FaMoneyBillWave, FaHome } from 'react-icons/fa';
+import MapPicker from "../components/map/MapPicker";
 
 const LAND_CATEGORIES = [
   'Residential Plot',
@@ -20,13 +21,12 @@ function AddProperty() {
     address: '',
     city: '',
     category: LAND_CATEGORIES[0],
-    rooms: 0, // ✅ keep required field for backend but do not show in UI
+    rooms: 0,
   });
 
+  const [mapPoint, setMapPoint] = useState(null); // ✅ {lat, lng}
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
-
-  // SAFETY LOCK: This prevents the "Ghost Redirect"
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const { title, description, price, address, city, category } = formData;
@@ -34,16 +34,11 @@ function AddProperty() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const { isLoading, isError, isSuccess, message } = useSelector(
-    (state) => state.properties
-  );
+  const { isLoading, isError, isSuccess, message } = useSelector((state) => state.properties);
 
   useEffect(() => {
-    if (isError) {
-      toast.error(message);
-    }
+    if (isError) toast.error(message);
 
-    // ONLY redirect if successful AND we actually pressed submit
     if (isSuccess && isSubmitted) {
       toast.success('Listing submitted for approval!');
       navigate('/dashboard');
@@ -55,10 +50,7 @@ function AddProperty() {
   }, [isError, isSuccess, message, navigate, dispatch, isSubmitted]);
 
   const onChange = (e) => {
-    setFormData((prevState) => ({
-      ...prevState,
-      [e.target.name]: e.target.value,
-    }));
+    setFormData((prevState) => ({ ...prevState, [e.target.name]: e.target.value }));
   };
 
   const onImageChange = (e) => {
@@ -75,6 +67,12 @@ function AddProperty() {
       return;
     }
 
+    // ✅ Require map selection (so map is always useful)
+    if (!mapPoint) {
+      toast.error("Please select the land location on the map");
+      return;
+    }
+
     const propertyData = new FormData();
     propertyData.append('title', title);
     propertyData.append('description', description);
@@ -83,8 +81,9 @@ function AddProperty() {
     propertyData.append('city', city);
     propertyData.append('category', category);
 
-    // ✅ REQUIRED by backend model, but we keep it hidden for Land listings
     propertyData.append('rooms', '0');
+    propertyData.append('lat', String(mapPoint.lat));
+    propertyData.append('lng', String(mapPoint.lng));
 
     propertyData.append('image', image);
 
@@ -108,7 +107,6 @@ function AddProperty() {
         </h1>
 
         <form onSubmit={onSubmit} className="space-y-6">
-          {/* TITLE */}
           <div>
             <label className="block text-gray-700 font-bold mb-2">Listing Title</label>
             <input
@@ -122,7 +120,6 @@ function AddProperty() {
             />
           </div>
 
-          {/* DESC */}
           <div>
             <label className="block text-gray-700 font-bold mb-2">Description</label>
             <textarea
@@ -136,7 +133,6 @@ function AddProperty() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* PRICE */}
             <div>
               <label className="block text-gray-700 font-bold mb-2">Price ($)</label>
               <div className="relative">
@@ -152,7 +148,6 @@ function AddProperty() {
               </div>
             </div>
 
-            {/* CATEGORY */}
             <div>
               <label className="block text-gray-700 font-bold mb-2">Land Type</label>
               <select
@@ -162,16 +157,13 @@ function AddProperty() {
                 className="w-full px-4 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {LAND_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
+                  <option key={c} value={c}>{c}</option>
                 ))}
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* ADDRESS */}
             <div className="col-span-2">
               <label className="block text-gray-700 font-bold mb-2">Address</label>
               <input
@@ -184,7 +176,6 @@ function AddProperty() {
               />
             </div>
 
-            {/* CITY */}
             <div>
               <label className="block text-gray-700 font-bold mb-2">City</label>
               <input
@@ -198,10 +189,14 @@ function AddProperty() {
             </div>
           </div>
 
-          {/* ✅ Bedrooms hidden (kept for backend compatibility) */}
+          {/* ✅ Map picker */}
+          <div>
+            <label className="block text-gray-700 font-bold mb-2">Select Land Location on Map</label>
+            <MapPicker value={mapPoint} onChange={setMapPoint} />
+          </div>
+
           <input type="hidden" name="rooms" value="0" readOnly />
 
-          {/* IMAGE UPLOAD */}
           <div>
             <label className="block text-gray-700 font-bold mb-2">Upload Image</label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition cursor-pointer relative">
@@ -222,7 +217,6 @@ function AddProperty() {
             </div>
           </div>
 
-          {/* SUBMIT BUTTON */}
           <button
             type="submit"
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition shadow-md"

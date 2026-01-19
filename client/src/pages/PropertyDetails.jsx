@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getProperty } from '../features/properties/propertySlice';
+import PropertyMap from "../components/map/PropertyMap";
 import { createInquiry, reset as resetInquiry } from '../features/inquiries/inquirySlice';
 import {
   FaMapMarkerAlt,
@@ -185,6 +186,18 @@ function PropertyDetails() {
             <p className="text-gray-600 leading-relaxed text-lg whitespace-pre-line">
               {property.description}
             </p>
+
+            {/* MAP SECTION */}
+            <div className="mt-8 bg-white rounded-xl shadow-md border p-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">Location</h2>
+              <div className="h-[400px] w-full rounded-lg overflow-hidden">
+                <PropertyMap
+                  lat={property?.location?.lat}
+                  lng={property?.location?.lng}
+                  title={property?.title}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="bg-white p-6 rounded-xl border border-gray-200 h-fit shadow-lg">

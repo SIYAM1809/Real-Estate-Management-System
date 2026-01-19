@@ -11,15 +11,18 @@ const propertySchema = mongoose.Schema(
     location: {
       address: { type: String, required: true },
       city: { type: String, required: true },
+
+      // ✅ Map coordinates (optional but recommended)
+      lat: { type: Number, default: null },
+      lng: { type: Number, default: null },
     },
 
     category: { type: String, required: [true, 'Please select a category'] },
 
     images: [{ public_id: String, url: String }],
 
-    // ✅ Land-only UI: rooms should NOT be required
-    // Keep it for backward compatibility; default 0 for land listings
-    rooms: { type: Number, default: 0, min: 0 },
+    // Keep for backend compatibility (you’re sending 0 for land)
+    rooms: { type: Number, required: true },
 
     status: {
       type: String,

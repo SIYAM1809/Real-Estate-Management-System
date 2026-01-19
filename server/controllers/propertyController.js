@@ -15,7 +15,17 @@ cloudinary.config({
 // @access  Private (seller/admin via middleware)
 const createProperty = async (req, res) => {
   try {
-    const { title, description, price, address, city, category, rooms } = req.body;
+    const {
+      title,
+      description,
+      price,
+      address,
+      city,
+      category,
+      rooms,
+      lat,
+      lng,
+    } = req.body;
 
     const images = [];
 
@@ -27,18 +37,28 @@ const createProperty = async (req, res) => {
       images.push({ url: result.secure_url, public_id: result.public_id });
     }
 
-    // ✅ Land-only UI: force rooms to a safe number (default 0)
-    const roomsNum = Number(rooms);
-    const safeRooms = Number.isFinite(roomsNum) && roomsNum > 0 ? roomsNum : 0;
+    // ✅ Safe parse for lat/lng (FormData sends strings)
+    const latNum =
+      lat !== undefined && lat !== null && String(lat).trim() !== ''
+        ? Number(lat)
+        : null;
+
+    const lngNum =
+      lng !== undefined && lng !== null && String(lng).trim() !== ''
+        ? Number(lng)
+        : null;
+
+    const safeLat = Number.isFinite(latNum) ? latNum : null;
+    const safeLng = Number.isFinite(lngNum) ? lngNum : null;
 
     const property = await Property.create({
       seller: req.user.id,
       title,
       description,
       price,
-      location: { address, city },
+      location: { address, city, lat: safeLat, lng: safeLng },
       category,
-      rooms: safeRooms,
+      rooms: rooms !== undefined ? rooms : 0,
       images,
       status: 'pending',
       adminComment: '',
@@ -95,9 +115,7 @@ const getProperties = async (req, res) => {
 const getProperty = async (req, res) => {
   try {
     const property = await Property.findById(req.params.id).populate('seller', 'name email');
-
     if (!property) return res.status(404).json({ message: 'Property not found' });
-
     res.json(property);
   } catch (error) {
     console.error(error);
@@ -117,19 +135,16 @@ const updateProperty = async (req, res) => {
       return res.status(401).json({ message: 'Not authorized' });
     }
 
-    // ✅ Only allow editable fields
     const allowed = ['title', 'description', 'price', 'location', 'category', 'rooms', 'isAvailable'];
     const updates = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
 
-    // ✅ If seller edits, it goes back to pending for re-approval
     updates.status = 'pending';
     updates.adminComment = '';
 
     const updatedProperty = await Property.findByIdAndUpdate(req.params.id, updates, { new: true });
-
     res.json(updatedProperty);
   } catch (error) {
     console.error(error);
@@ -164,7 +179,6 @@ const deleteProperty = async (req, res) => {
     const isOwner = property.seller.toString() === req.user.id;
     const isAdmin = req.user.role === 'admin';
 
-    // ✅ Seller can delete own listing, Admin can delete any listing
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ message: 'Forbidden: Not allowed to delete this listing' });
     }
@@ -184,10 +198,8 @@ const getAllPropertiesAdmin = async (req, res) => {
   try {
     const properties = await Property.find({})
       .populate('seller', 'name email')
-      // ✅ Pending first using explicit order
       .sort({ createdAt: -1 });
 
-    // ✅ Stable pending-first ordering in code (no guessing with string sort)
     const rank = { pending: 0, rejected: 1, approved: 2 };
     properties.sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9));
 
@@ -217,7 +229,6 @@ const updateStatus = async (req, res) => {
 
     await property.save();
 
-    // Email seller when status changes
     try {
       const seller = await User.findById(property.seller).select('email name');
       if (seller?.email) {
@@ -230,7 +241,6 @@ const updateStatus = async (req, res) => {
         });
       }
     } catch (e) {
-      // Don't break main flow if email fails
       console.error('Failed to send status email:', e.message);
     }
 
