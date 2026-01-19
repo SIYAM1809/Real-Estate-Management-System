@@ -83,11 +83,13 @@ function PropertyItem({ property }) {
             <FaMapMarkerAlt className="mr-1" /> {property.location?.city || 'Unknown'}
           </div>
 
-          {/* ✅ Bedrooms removed (Land-only UI) */}
           <div className="flex justify-between items-center border-t border-gray-100 pt-4">
             <span className="text-2xl font-bold text-blue-600 flex items-center gap-1">
               <FaMoneyBillWave className="text-lg" /> {property.price?.toLocaleString()}
             </span>
+
+            {/* ✅ Land listing: no bedrooms */}
+            <span className="text-sm font-semibold text-gray-500">Land</span>
           </div>
         </div>
       </Link>

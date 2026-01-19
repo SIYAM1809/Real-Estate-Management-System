@@ -6,6 +6,13 @@ import { FaSearch, FaFilter } from 'react-icons/fa';
 import axios from 'axios';
 import { API_BASE } from '../utils/apiBase';
 
+const LAND_CATEGORIES = [
+  'Residential Plot',
+  'Commercial Plot',
+  'Agricultural Land',
+  'Industrial Land',
+];
+
 function Properties() {
   const dispatch = useDispatch();
 
@@ -27,7 +34,8 @@ function Properties() {
     if (user?.role === 'buyer') {
       dispatch(getFavorites());
     }
-  }, [dispatch, user]); // ok
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, user]);
 
   const fetchFilteredProperties = async () => {
     setLoading(true);
@@ -78,7 +86,7 @@ function Properties() {
                 name="keyword"
                 value={filters.keyword}
                 onChange={onChange}
-                placeholder="Search homes..."
+                placeholder="Search land..."
                 className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -100,7 +108,7 @@ function Properties() {
 
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">
-              Type
+              Land Type
             </label>
             <select
               name="category"
@@ -109,9 +117,11 @@ function Properties() {
               className="w-full px-4 py-2 border rounded-lg bg-white"
             >
               <option value="All">All Types</option>
-              <option value="House">House</option>
-              <option value="Apartment">Apartment</option>
-              <option value="Commercial">Commercial</option>
+              {LAND_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -127,7 +137,7 @@ function Properties() {
       </div>
 
       <h1 className="text-3xl font-bold text-gray-800 mb-6">
-        Available Properties
+        Available Land Listings
       </h1>
 
       {loading ? (
@@ -140,7 +150,7 @@ function Properties() {
         </div>
       ) : (
         <div className="text-center py-20 bg-gray-50 rounded-lg border-2 border-dashed">
-          <h3 className="text-xl text-gray-500">No properties found.</h3>
+          <h3 className="text-xl text-gray-500">No listings found.</h3>
         </div>
       )}
     </div>
