@@ -17,7 +17,9 @@ const propertySchema = mongoose.Schema(
 
     images: [{ public_id: String, url: String }],
 
-    rooms: { type: Number, required: true },
+    // ✅ Land-only UI: rooms should NOT be required
+    // Keep it for backward compatibility; default 0 for land listings
+    rooms: { type: Number, default: 0, min: 0 },
 
     status: {
       type: String,
@@ -25,9 +27,7 @@ const propertySchema = mongoose.Schema(
       default: 'pending',
     },
 
-    // ✅ NEW: optional admin note on approve/reject
     adminComment: { type: String, default: '' },
-
     isAvailable: { type: Boolean, default: true },
   },
   { timestamps: true }

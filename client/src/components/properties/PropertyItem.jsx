@@ -1,6 +1,6 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
-import { FaBed, FaMapMarkerAlt, FaHeart, FaRegHeart, FaMoneyBillWave } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaHeart, FaRegHeart, FaMoneyBillWave } from 'react-icons/fa';
 import { toggleFavorite } from '../../features/favorites/favoriteSlice';
 import { toast } from 'react-toastify';
 
@@ -83,13 +83,11 @@ function PropertyItem({ property }) {
             <FaMapMarkerAlt className="mr-1" /> {property.location?.city || 'Unknown'}
           </div>
 
+          {/* ✅ Bedrooms removed (Land-only UI) */}
           <div className="flex justify-between items-center border-t border-gray-100 pt-4">
             <span className="text-2xl font-bold text-blue-600 flex items-center gap-1">
               <FaMoneyBillWave className="text-lg" /> {property.price?.toLocaleString()}
             </span>
-            <div className="flex items-center gap-2 text-gray-500">
-              <FaBed /> {property.rooms} Beds
-            </div>
           </div>
         </div>
       </Link>

@@ -1,11 +1,9 @@
-// client/src/pages/PropertyDetails.jsx
 import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getProperty } from '../features/properties/propertySlice';
 import { createInquiry, reset as resetInquiry } from '../features/inquiries/inquirySlice';
 import {
-  FaBed,
   FaMapMarkerAlt,
   FaArrowLeft,
   FaMoneyBillWave,
@@ -25,18 +23,19 @@ function PropertyDetails() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  // Inquiry state
+  const [message, setMessage] = useState('');
   const [showForm, setShowForm] = useState(false);
+
+  const [inquiryType, setInquiryType] = useState('message');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
-  const [note, setNote] = useState('');
-  const [place, setPlace] = useState('');
 
-  // Review state
   const [rating, setRating] = useState(5);
   const [reviewText, setReviewText] = useState('');
 
-  const { property, isLoading, isError, message: errorMsg } = useSelector((state) => state.properties);
+  const { property, isLoading, isError, message: errorMsg } = useSelector(
+    (state) => state.properties
+  );
   const { user } = useSelector((state) => state.auth);
 
   const {
@@ -63,28 +62,18 @@ function PropertyDetails() {
     if (id) dispatch(getPropertyReviews(id));
   }, [dispatch, id]);
 
-  // Prefill place from property location once loaded
-  useEffect(() => {
-    const fallbackPlace =
-      property?.location?.address
-        ? `${property.location.address}${property.location.city ? ', ' + property.location.city : ''}`
-        : '';
-    if (fallbackPlace && !place) setPlace(fallbackPlace);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [property?.location?.address, property?.location?.city]);
-
   useEffect(() => {
     if (inquiryError) {
       toast.error(inquiryMsg);
       dispatch(resetInquiry());
     }
     if (inquirySuccess) {
-      toast.success('Visit request sent to seller ✅');
+      toast.success('Message sent to seller ✅');
       setShowForm(false);
+      setMessage('');
       setDate('');
       setTime('');
-      setNote('');
-      // keep place (user might reuse)
+      setInquiryType('message');
       dispatch(resetInquiry());
     }
   }, [inquiryError, inquirySuccess, inquiryMsg, dispatch]);
@@ -103,34 +92,30 @@ function PropertyDetails() {
     e.preventDefault();
 
     if (!isLoggedIn) {
-      toast.error('Please login to request a visit');
+      toast.error('Please login to contact the seller');
       navigate('/login');
       return;
     }
+
     if (!isBuyer) {
-      toast.error('Only buyers can request a visit.');
+      toast.error('Only buyers can send inquiries.');
       return;
     }
 
-    if (!date || !time) {
+    if (inquiryType === 'appointment' && (!date || !time)) {
       toast.error('Please select appointment date and time');
       return;
     }
 
-    const payload = {
+    const data = {
+      message,
       propertyId: property._id,
-      type: 'appointment',
-      appointmentDate: date,
-      appointmentTime: time,
-
-      // ✅ buyer sends place
-      requestedPlace: (place || '').trim(),
-
-      // ✅ backend requires "message" -> send note if provided, otherwise a safe default
-      message: (note || '').trim() || 'Visit request',
+      type: inquiryType,
+      appointmentDate: inquiryType === 'appointment' ? date : undefined,
+      appointmentTime: inquiryType === 'appointment' ? time : undefined,
     };
 
-    dispatch(createInquiry(payload));
+    dispatch(createInquiry(data));
   };
 
   const onReviewSubmit = (e) => {
@@ -155,9 +140,8 @@ function PropertyDetails() {
     );
   };
 
-  if (isLoading || !property?.title) {
+  if (isLoading || !property?.title)
     return <div className="text-center mt-20 text-2xl animate-pulse">Loading...</div>;
-  }
   if (isError) return <div className="text-center mt-20 text-red-500">Error: {errorMsg}</div>;
 
   return (
@@ -185,15 +169,16 @@ function PropertyDetails() {
         <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-10">
           <div className="md:col-span-2 space-y-6">
             <h1 className="text-4xl font-extrabold text-gray-800">{property.title}</h1>
+
             <div className="flex items-center text-gray-500 text-lg">
               <FaMapMarkerAlt className="mr-2 text-blue-500" />
               {property.location?.address}, {property.location?.city}
             </div>
 
-            <div className="flex items-center gap-8 py-6 border-y border-gray-100 bg-gray-50 px-6 rounded-lg">
-              <div className="flex items-center gap-3">
-                <FaBed className="text-3xl text-blue-500" />
-                <span className="font-bold text-xl">{property.rooms} Bedrooms</span>
+            {/* ✅ Bedrooms section removed (Land-only UI) */}
+            <div className="py-4 border-y border-gray-100 bg-gray-50 px-6 rounded-lg">
+              <div className="text-sm text-gray-600">
+                <span className="font-bold text-gray-800">Land Category:</span> {property.category}
               </div>
             </div>
 
@@ -215,71 +200,90 @@ function PropertyDetails() {
               <p className="font-bold text-lg text-gray-800">{property.seller?.name}</p>
             </div>
 
-            {/* Buyer-only Request Visit */}
             {!isLoggedIn ? (
               <button
                 onClick={() => {
-                  toast.info('Login as a buyer to request a visit');
+                  toast.info('Login as a buyer to contact the seller');
                   navigate('/login');
                 }}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg transition shadow-md flex items-center justify-center gap-2"
               >
-                <FaEnvelope /> Login to Request Visit
+                <FaEnvelope /> Login to Contact
               </button>
             ) : !isBuyer ? (
               <div className="w-full bg-gray-100 text-gray-700 font-semibold p-4 rounded-lg border border-gray-200 text-center">
-                Only buyers can request visits ✋
+                Only buyers can contact sellers ✋
               </div>
             ) : !showForm ? (
               <button
                 onClick={() => setShowForm(true)}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg transition shadow-md flex items-center justify-center gap-2"
               >
-                <FaEnvelope /> Request Visit
+                <FaEnvelope /> Contact / Schedule Visit
               </button>
             ) : (
               <form onSubmit={onInquirySubmit} className="space-y-4 bg-gray-50 p-4 rounded border">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500">Date</label>
+                <div className="flex gap-4 mb-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
-                      type="date"
-                      className="w-full p-2 border rounded"
-                      required
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
+                      type="radio"
+                      name="type"
+                      value="message"
+                      checked={inquiryType === 'message'}
+                      onChange={() => setInquiryType('message')}
                     />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500">Time</label>
+                    <span>Message</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
-                      type="time"
-                      className="w-full p-2 border rounded"
-                      required
-                      value={time}
-                      onChange={(e) => setTime(e.target.value)}
+                      type="radio"
+                      name="type"
+                      value="appointment"
+                      checked={inquiryType === 'appointment'}
+                      onChange={() => setInquiryType('appointment')}
                     />
-                  </div>
+                    <span className="font-bold text-blue-600">Request Visit</span>
+                  </label>
                 </div>
 
-                <div>
-                  <label className="text-xs font-bold text-gray-500">Preferred Place</label>
-                  <input
-                    type="text"
-                    className="w-full p-2 border rounded"
-                    placeholder="e.g. Property gate / Nearby cafe"
-                    value={place}
-                    onChange={(e) => setPlace(e.target.value)}
-                  />
-                </div>
+                {inquiryType === 'appointment' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500">Date</label>
+                      <input
+                        type="date"
+                        className="w-full p-2 border rounded"
+                        required
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500">Time</label>
+                      <input
+                        type="time"
+                        className="w-full p-2 border rounded"
+                        required
+                        value={time}
+                        onChange={(e) => setTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
 
-                <label className="text-sm font-bold text-gray-700">Additional Note (optional)</label>
+                <label className="text-sm font-bold text-gray-700">Additional Note</label>
                 <textarea
                   className="w-full p-2 border rounded focus:outline-blue-500"
                   rows="3"
-                  placeholder="Any note for the seller..."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  placeholder={
+                    inquiryType === 'appointment'
+                      ? 'I would like to see the land boundary...'
+                      : 'Is the price negotiable?'
+                  }
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  required
                 />
 
                 <div className="flex gap-2">
@@ -287,7 +291,8 @@ function PropertyDetails() {
                     type="submit"
                     className="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700 flex justify-center items-center gap-2"
                   >
-                    <FaPaperPlane /> Send Visit Request
+                    <FaPaperPlane />{' '}
+                    {inquiryType === 'appointment' ? 'Request Appointment' : 'Send Message'}
                   </button>
 
                   <button
@@ -304,7 +309,7 @@ function PropertyDetails() {
         </div>
       </div>
 
-      {/* Reviews section unchanged */}
+      {/* REVIEWS SECTION */}
       <div className="mt-10 bg-white rounded-xl shadow-md border p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-gray-800">Reviews</h2>

@@ -27,6 +27,10 @@ const createProperty = async (req, res) => {
       images.push({ url: result.secure_url, public_id: result.public_id });
     }
 
+    // ✅ Land-only UI: force rooms to a safe number (default 0)
+    const roomsNum = Number(rooms);
+    const safeRooms = Number.isFinite(roomsNum) && roomsNum > 0 ? roomsNum : 0;
+
     const property = await Property.create({
       seller: req.user.id,
       title,
@@ -34,8 +38,8 @@ const createProperty = async (req, res) => {
       price,
       location: { address, city },
       category,
-      rooms,
-      images, // ✅ empty array if no upload
+      rooms: safeRooms,
+      images,
       status: 'pending',
       adminComment: '',
     });

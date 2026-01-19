@@ -12,12 +12,15 @@ function AddProperty() {
     price: '',
     address: '',
     city: '',
-    category: 'House',
-    rooms: '',
+    // ✅ Land categories
+    category: 'Residential Plot',
+    // ✅ Hidden in UI, still sent to backend safely
+    rooms: '0',
   });
+
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
-  
+
   // SAFETY LOCK: This prevents the "Ghost Redirect"
   const [isSubmitted, setIsSubmitted] = useState(false);
 
@@ -26,14 +29,10 @@ function AddProperty() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const { isLoading, isError, isSuccess, message } = useSelector(
-    (state) => state.properties
-  );
+  const { isLoading, isError, isSuccess, message } = useSelector((state) => state.properties);
 
   useEffect(() => {
-    if (isError) {
-      toast.error(message);
-    }
+    if (isError) toast.error(message);
 
     // ONLY redirect if successful AND we actually pressed submit
     if (isSuccess && isSubmitted) {
@@ -75,12 +74,13 @@ function AddProperty() {
     propertyData.append('address', address);
     propertyData.append('city', city);
     propertyData.append('category', category);
-    propertyData.append('rooms', rooms);
+
+    // ✅ Force rooms=0 always (hidden field behavior)
+    propertyData.append('rooms', rooms && String(rooms).trim() !== '' ? rooms : '0');
+
     propertyData.append('image', image);
 
-    // TURN THE SAFETY LOCK KEY
     setIsSubmitted(true);
-    
     dispatch(createProperty(propertyData));
   };
 
@@ -90,26 +90,28 @@ function AddProperty() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
-      <Link to="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-blue-600 mb-6 w-fit">
+      <Link
+        to="/dashboard"
+        className="flex items-center gap-2 text-gray-600 hover:text-blue-600 mb-6 w-fit"
+      >
         <FaArrowLeft /> Back to Dashboard
       </Link>
 
       <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
         <h1 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-          <FaHome className="text-blue-600" /> Add New Property
+          <FaHome className="text-blue-600" /> Add Land Listing
         </h1>
 
         <form onSubmit={onSubmit} className="space-y-6">
-          
           {/* TITLE */}
           <div>
-            <label className="block text-gray-700 font-bold mb-2">Property Title</label>
+            <label className="block text-gray-700 font-bold mb-2">Land Title</label>
             <input
               type="text"
               name="title"
               value={title}
               onChange={onChange}
-              placeholder="e.g. Luxury Apartment in Gulshan"
+              placeholder="e.g. Residential Plot in Gulshan"
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
@@ -122,7 +124,7 @@ function AddProperty() {
               name="description"
               value={description}
               onChange={onChange}
-              placeholder="Describe the features, neighborhood, etc."
+              placeholder="Road access, boundary info, nearby landmark, documents, etc."
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-32"
               required
             ></textarea>
@@ -147,16 +149,17 @@ function AddProperty() {
 
             {/* CATEGORY */}
             <div>
-              <label className="block text-gray-700 font-bold mb-2">Category</label>
+              <label className="block text-gray-700 font-bold mb-2">Land Category</label>
               <select
                 name="category"
                 value={category}
                 onChange={onChange}
                 className="w-full px-4 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="House">House</option>
-                <option value="Apartment">Apartment</option>
-                <option value="Commercial">Commercial</option>
+                <option value="Residential Plot">Residential Plot</option>
+                <option value="Commercial Plot">Commercial Plot</option>
+                <option value="Agricultural Land">Agricultural Land</option>
+                <option value="Industrial Land">Industrial Land</option>
               </select>
             </div>
           </div>
@@ -189,18 +192,8 @@ function AddProperty() {
             </div>
           </div>
 
-          {/* ROOMS */}
-          <div>
-            <label className="block text-gray-700 font-bold mb-2">Bedrooms</label>
-            <input
-              type="number"
-              name="rooms"
-              value={rooms}
-              onChange={onChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
+          {/* ✅ Bedrooms removed from UI */}
+          {/* rooms stays in state and is forced to 0 in submission */}
 
           {/* IMAGE UPLOAD */}
           <div>
@@ -213,7 +206,11 @@ function AddProperty() {
                 accept="image/*"
               />
               {preview ? (
-                <img src={preview} alt="Preview" className="h-40 mx-auto object-cover rounded shadow" />
+                <img
+                  src={preview}
+                  alt="Preview"
+                  className="h-40 mx-auto object-cover rounded shadow"
+                />
               ) : (
                 <div className="text-gray-500">
                   <FaCloudUploadAlt className="text-4xl mx-auto mb-2" />
@@ -230,7 +227,6 @@ function AddProperty() {
           >
             Submit Listing
           </button>
-
         </form>
       </div>
     </div>
