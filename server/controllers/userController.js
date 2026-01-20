@@ -164,47 +164,49 @@ const forgotPassword = async (req, res) => {
     const user = await User.findOne({ email });
 
     // Security: do NOT reveal if email exists
+    const genericMsg = 'If the email exists, a reset link has been sent.';
+
     if (!user) {
-      return res.status(200).json({ message: 'If the email exists, a reset link has been sent.' });
+      return res.status(200).json({ message: genericMsg });
     }
 
     // Create reset token (raw) + store hashed in DB
     const resetToken = crypto.randomBytes(32).toString('hex');
     const hashed = crypto.createHash('sha256').update(resetToken).digest('hex');
 
-    // Store as timestamp number (milliseconds)
+    // Store as timestamp number (ms)
     user.resetPasswordToken = hashed;
     user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
     await user.save();
 
     const resetLink = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
-    // ✅ NEW: capture email result + log it
-    const emailResult = await sendEmail({
-      to: user.email,
-      subject: 'Reset your SyntaxEstate password',
-      text: `Reset your password using this link (valid for 15 minutes): ${resetLink}`,
-      html: `
-        <div style="font-family:Arial,sans-serif">
-          <h2>Password Reset</h2>
-          <p>Click to reset your password (valid for <b>15 minutes</b>):</p>
-          <p><a href="${resetLink}">${resetLink}</a></p>
-          <p>If you didn't request this, ignore this email.</p>
-        </div>
-      `,
-    });
+    // Email sending should NOT break the endpoint
+    try {
+      const result = await sendEmail({
+        to: user.email,
+        subject: 'Reset your SyntaxEstate password',
+        text: `Reset your password using this link (valid for 15 minutes): ${resetLink}`,
+        html: `
+          <div style="font-family:Arial,sans-serif">
+            <h2>Password Reset</h2>
+            <p>Click to reset your password (valid for <b>15 minutes</b>):</p>
+            <p><a href="${resetLink}">${resetLink}</a></p>
+            <p>If you didn't request this, ignore this email.</p>
+          </div>
+        `,
+      });
 
-    console.log('[FORGOT_PASSWORD][EMAIL_RESULT]', emailResult);
-
-    // ✅ In local dev, fail loudly if sending was skipped
-    if (process.env.NODE_ENV !== 'production' && emailResult?.skipped) {
-      return res.status(500).json({ message: `Email skipped: ${emailResult.reason}` });
+      console.log('[forgotPassword] email result:', result);
+    } catch (mailErr) {
+      console.error('[forgotPassword] email send failed:', mailErr?.message || mailErr);
     }
 
-    return res.status(200).json({ message: 'If the email exists, a reset link has been sent.' });
+    return res.status(200).json({ message: genericMsg });
   } catch (err) {
-    console.error('[FORGOT_PASSWORD][ERROR]', err?.message || err);
-    return res.status(500).json({ message: 'Server Error' });
+    console.error('[forgotPassword] unexpected error:', err?.message || err);
+    // Still return 200 to avoid UI spam + email enumeration
+    return res.status(200).json({ message: 'If the email exists, a reset link has been sent.' });
   }
 };
 
@@ -215,6 +217,7 @@ const resetPassword = async (req, res) => {
   try {
     const rawToken = req.params.token;
     const newPassword = String(req.body.password || '');
+
     if (!rawToken) return res.status(400).json({ message: 'Token missing.' });
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters.' });
@@ -222,6 +225,7 @@ const resetPassword = async (req, res) => {
 
     const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
 
+    // Compare with Date.now() timestamp
     const user = await User.findOne({
       resetPasswordToken: hashed,
       resetPasswordExpire: { $gt: Date.now() },
@@ -229,9 +233,11 @@ const resetPassword = async (req, res) => {
 
     if (!user) return res.status(400).json({ message: 'Invalid or expired reset token.' });
 
+    // Hash and set password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
 
+    // Clear reset fields
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
 
@@ -239,7 +245,7 @@ const resetPassword = async (req, res) => {
 
     return res.status(200).json({ message: 'Password reset successful. Please login.' });
   } catch (err) {
-    console.error('[RESET_PASSWORD][ERROR]', err?.message || err);
+    console.error('[resetPassword] error:', err?.message || err);
     return res.status(500).json({ message: 'Server Error' });
   }
 };
