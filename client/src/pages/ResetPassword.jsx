@@ -10,19 +10,50 @@ function ResetPassword() {
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (password !== confirm) return toast.error("Passwords do not match");
+
+    if (!token) {
+      toast.error("Reset token missing in URL");
+      return;
+    }
+
+    if (password !== confirm) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
 
     try {
-      const res = await axios.put(`${API_BASE}/api/users/reset-password/${token}`, {
-        password,
-      });
-      toast.success(res.data.message);
-      navigate("/login");
+      setSubmitting(true);
+
+      const res = await axios.put(
+        `${API_BASE}/api/users/reset-password/${token}`,
+        { password }
+      );
+
+      const msg = res?.data?.message || "Password reset successful. Please login.";
+
+      // ✅ Critical: clear old login state so your app doesn't act weird
+      localStorage.removeItem("user");
+
+      toast.success(msg);
+
+      // ✅ Stronger redirect (prevents back-button weirdness)
+      navigate("/login", { replace: true });
     } catch (err) {
-      toast.error(err.response?.data?.message || "Invalid/expired token");
+      console.log("[RESET PASSWORD ERROR]", err);
+
+      const apiMsg = err?.response?.data?.message;
+      toast.error(apiMsg || "Reset failed. Token invalid/expired or server error.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -39,6 +70,7 @@ function ResetPassword() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={submitting}
           />
           <input
             type="password"
@@ -47,9 +79,17 @@ function ResetPassword() {
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             required
+            disabled={submitting}
           />
-          <button className="w-full bg-green-600 text-white font-bold py-2 rounded hover:bg-green-700">
-            Reset Password
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className={`w-full text-white font-bold py-2 rounded ${
+              submitting ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+            }`}
+          >
+            {submitting ? "Resetting..." : "Reset Password"}
           </button>
         </form>
       </div>
