@@ -162,6 +162,7 @@ const forgotPassword = async (req, res) => {
     if (!email) return res.status(400).json({ message: 'Email is required.' });
 
     const user = await User.findOne({ email });
+
     // Security: do NOT reveal if email exists
     if (!user) {
       return res.status(200).json({ message: 'If the email exists, a reset link has been sent.' });
@@ -171,14 +172,15 @@ const forgotPassword = async (req, res) => {
     const resetToken = crypto.randomBytes(32).toString('hex');
     const hashed = crypto.createHash('sha256').update(resetToken).digest('hex');
 
-    // ✅ FIX: Store as timestamp number (milliseconds), not Date object
+    // Store as timestamp number (milliseconds)
     user.resetPasswordToken = hashed;
     user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
     await user.save();
 
     const resetLink = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
-    await sendEmail({
+    // ✅ NEW: capture email result + log it
+    const emailResult = await sendEmail({
       to: user.email,
       subject: 'Reset your SyntaxEstate password',
       text: `Reset your password using this link (valid for 15 minutes): ${resetLink}`,
@@ -192,8 +194,16 @@ const forgotPassword = async (req, res) => {
       `,
     });
 
+    console.log('[FORGOT_PASSWORD][EMAIL_RESULT]', emailResult);
+
+    // ✅ In local dev, fail loudly if sending was skipped
+    if (process.env.NODE_ENV !== 'production' && emailResult?.skipped) {
+      return res.status(500).json({ message: `Email skipped: ${emailResult.reason}` });
+    }
+
     return res.status(200).json({ message: 'If the email exists, a reset link has been sent.' });
   } catch (err) {
+    console.error('[FORGOT_PASSWORD][ERROR]', err?.message || err);
     return res.status(500).json({ message: 'Server Error' });
   }
 };
@@ -212,19 +222,16 @@ const resetPassword = async (req, res) => {
 
     const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    // ✅ FIX: Compare with Date.now() (timestamp number) not new Date() (Date object)
     const user = await User.findOne({
       resetPasswordToken: hashed,
-      resetPasswordExpire: { $gt: Date.now() }, // Compare numbers, not Date objects
+      resetPasswordExpire: { $gt: Date.now() },
     });
 
     if (!user) return res.status(400).json({ message: 'Invalid or expired reset token.' });
 
-    // Hash and set password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
 
-    // Clear reset fields
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
 
@@ -232,6 +239,7 @@ const resetPassword = async (req, res) => {
 
     return res.status(200).json({ message: 'Password reset successful. Please login.' });
   } catch (err) {
+    console.error('[RESET_PASSWORD][ERROR]', err?.message || err);
     return res.status(500).json({ message: 'Server Error' });
   }
 };
