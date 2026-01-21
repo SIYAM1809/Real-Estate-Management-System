@@ -1,5 +1,7 @@
+# =========================
 # Logs
-logs
+# =========================
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,19 +9,63 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# =========================
+# Dependencies
+# =========================
+node_modules/
 
-# Editor directories and files
+# =========================
+# Build outputs
+# =========================
+dist/
+dist-ssr/
+build/
+coverage/
+.vite/
+.cache/
+.tmp/
+.temp/
+
+# =========================
+# Environment files (IMPORTANT)
+# =========================
+.env
+.env.*
+client/.env
+client/.env.*
+server/.env
+server/.env.*
+
+# =========================
+# Uploads / user-generated files
+# =========================
+server/uploads/
+
+# =========================
+# Editor / OS junk
+# =========================
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-*.env
+
+# =========================
+# Vercel / Next / misc
+# =========================
+.vercel/
+.next/
+
+# =========================
+# Optional: lockfiles policy
+# (keep these if you use npm)
+# =========================
+# If you DON'T want lockfiles tracked, uncomment:
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
