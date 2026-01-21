@@ -1,4 +1,4 @@
-Real Estate Management System (MERN)
+##Real Estate Management System (MERN)
 A full-stack real-estate marketplace where Sellers submit properties, Admins approve listings, and Buyers browse and save favorites.
 
 🌐 Live Demo: https://syntaxestate.vercel.app
