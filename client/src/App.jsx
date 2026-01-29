@@ -1,6 +1,7 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { AnimatePresence } from 'framer-motion';
 
 // PAGES
 import Home from './pages/Home';
@@ -20,73 +21,87 @@ import AdminReviews from './pages/dashboard/AdminReviews';
 
 // COMPONENTS
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 import PrivateRoute from './components/PrivateRoute';
+
+// Separated component to use useLocation hook
+const AnimatedRoutes = () => {
+  const location = useLocation();
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        {/* PUBLIC */}
+        <Route path="/" element={<Home />} />
+        <Route path="/properties" element={<Properties />} />
+        <Route path="/property/:id" element={<PropertyDetails />} />
+
+        {/* AUTH */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
+
+        {/* BUYER */}
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute allowedRoles={['buyer']}>
+              <BuyerDashboard />
+            </PrivateRoute>
+          }
+        />
+
+        {/* SELLER */}
+        <Route
+          path="/seller-dashboard"
+          element={
+            <PrivateRoute allowedRoles={['seller']}>
+              <SellerDashboard />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/add-property"
+          element={
+            <PrivateRoute allowedRoles={['seller']}>
+              <AddProperty />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ADMIN */}
+        <Route
+          path="/admin-dashboard"
+          element={
+            <PrivateRoute allowedRoles={['admin']}>
+              <AdminDashboard />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/admin-reviews"
+          element={
+            <PrivateRoute allowedRoles={['admin']}>
+              <AdminReviews />
+            </PrivateRoute>
+          }
+        />
+      </Routes>
+    </AnimatePresence>
+  );
+};
 
 function App() {
   return (
     <>
       <Router>
-        <div className="min-h-screen bg-white font-sans text-gray-900">
+        <div className="min-h-screen bg-slate-50 font-sans text-slate-900 bg-grid-pattern flex flex-col justify-between">
           <Navbar />
-
-          <Routes>
-            {/* PUBLIC */}
-            <Route path="/" element={<Home />} />
-            <Route path="/properties" element={<Properties />} />
-            <Route path="/property/:id" element={<PropertyDetails />} />
-
-            {/* AUTH */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password/:token" element={<ResetPassword />} />
-
-            {/* BUYER */}
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute allowedRoles={['buyer']}>
-                  <BuyerDashboard />
-                </PrivateRoute>
-              }
-            />
-
-            {/* SELLER */}
-            <Route
-              path="/seller-dashboard"
-              element={
-                <PrivateRoute allowedRoles={['seller']}>
-                  <SellerDashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/add-property"
-              element={
-                <PrivateRoute allowedRoles={['seller']}>
-                  <AddProperty />
-                </PrivateRoute>
-              }
-            />
-
-            {/* ADMIN */}
-            <Route
-              path="/admin-dashboard"
-              element={
-                <PrivateRoute allowedRoles={['admin']}>
-                  <AdminDashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/admin-reviews"
-              element={
-                <PrivateRoute allowedRoles={['admin']}>
-                  <AdminReviews />
-                </PrivateRoute>
-              }
-            />
-          </Routes>
+          <div className="flex-grow">
+            <AnimatedRoutes />
+          </div>
+          <Footer />
         </div>
       </Router>
 
